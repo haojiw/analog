@@ -1,0 +1,18 @@
+{
+  "private": true,
+  "workspaces": [
+    "apps/mobile",
+    "packages/shared-types"
+  ],
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.0"
+  },
+  "lint-staged": {
+    "apps/mobile/**/*.{ts,tsx}": "bash -c 'npx tsc --noEmit -p apps/mobile/tsconfig.json'",
+    "packages/shared-types/**/*.ts": "bash -c 'npx tsc --noEmit -p packages/shared-types/tsconfig.json'"
+  }
+}

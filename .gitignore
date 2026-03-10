@@ -1,0 +1,29 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+ios/
+android/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Signing credentials — never commit these
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Local
+.archived/
