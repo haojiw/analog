@@ -14,12 +14,18 @@ config.resolver.nodeModulesPaths = [
 ];
 config.resolver.sourceExts = ['ts', 'tsx', ...config.resolver.sourceExts];
 
-// Force all react/react-native imports to resolve from the app's node_modules,
-// preventing the "multiple copies of React" error in npm workspaces monorepos.
-config.resolver.extraNodeModules = {
-  react: path.resolve(projectRoot, 'node_modules/react'),
-  'react-native': path.resolve(projectRoot, 'node_modules/react-native'),
-  'react-native-css-interop': path.resolve(projectRoot, 'node_modules/react-native-css-interop'),
+// Force react and react-native to a single resolved path, preventing the
+// "multiple copies of React" error caused by npm workspace hoisting.
+const forcedModules = {
+  react: require.resolve('react'),
+  'react-native': require.resolve('react-native'),
+};
+
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (forcedModules[moduleName]) {
+    return { filePath: forcedModules[moduleName], type: 'sourceFile' };
+  }
+  return context.resolveRequest(context, moduleName, platform);
 };
 
 module.exports = withNativeWind(config, { input: './global.css' });
