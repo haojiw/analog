@@ -40,8 +40,8 @@ analog/                          ← repo root
 │   └── migrations/              ← SQL migrations
 └── docs/
     ├── core/                    ← North stars, product values
-    ├── decisions/               ← ADRs
-    ├── meetings/                ← Session notes
+    ├── next-steps/              ← Next steps and future plans
+    ├── session-notes/           ← Session notes, named yymmdd-title
     └── principles/              ← Coding + writing principles
 ```
 
@@ -76,8 +76,8 @@ Add new apps to `workspaces` in root `package.json` when initialized.
 ## Docs
 
 - `docs/core` - keeps core values and north stars
-- `docs/decisions` - keeps decisions made and objectives
-- `docs/meetings` - keeps meeting notes from each session
+- `docs/next-steps` - keeps next steps and future plans
+- `docs/session-notes` - keeps session notes, named yymmdd-title
 - `docs/principles` - coding and writing principles
 
 ---

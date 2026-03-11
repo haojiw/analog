@@ -1,7 +1,7 @@
 # Migration Assessment: Old Analog Repo → New Analog Mobile App
 2026-03-10
 
-*Full thinker review. Conclusions condensed into `docs/decisions/03-migration-from-old-repo.md`.*
+*Full thinker review. Conclusions condensed into `docs/session-notes/260310-migration-decisions.md`.*
 
 ---
 
