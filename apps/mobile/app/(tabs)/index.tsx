@@ -1,222 +1,166 @@
+import { useRef, useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Animated, Easing } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text, View } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 
-import { palette } from '../../src/shared/mockup-theme';
+const C = {
+  bgBase: '#F4F2EB',
+  inkDark: '#2C2B29',
+  inkLight: '#8A8882',
+  accentYellow: '#F4B925',
+  accentRed: '#C95233',
+};
+const FONT_MONO = Platform.OS === 'ios' ? 'Courier New' : 'monospace';
+const FONT_SERIF = Platform.OS === 'ios' ? 'Georgia' : 'serif';
 
-const compassLines = Array.from({ length: 12 }, (_, index) => index);
+const RINGS = [
+  { r: 40, dashArray: '2 4', opacity: 0.8 },
+  { r: 70, dashArray: '4 6', opacity: 0.6 },
+  { r: 100, dashArray: '1 3', opacity: 0.4 },
+  { r: 130, dashArray: '5 5', opacity: 0.3 },
+  { r: 160, dashArray: '2 8', opacity: 0.15 },
+];
 
-export default function RecordScreen() {
+export default function CaptureScreen() {
+  const [recording, setRecording] = useState(false);
+  const breathe = useRef(new Animated.Value(1)).current;
+  const anim = useRef<Animated.CompositeAnimation | null>(null);
+
+  useEffect(() => {
+    if (recording) {
+      anim.current = Animated.loop(
+        Animated.sequence([
+          Animated.timing(breathe, { toValue: 1.05, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(breathe, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ])
+      );
+      anim.current.start();
+    } else {
+      anim.current?.stop();
+      breathe.setValue(1);
+    }
+  }, [recording]);
+
+  const ringColor = recording ? C.accentRed : C.inkDark;
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: palette.paper }}>
-      <View style={{ flex: 1, paddingHorizontal: 24, paddingTop: 18, paddingBottom: 20 }}>
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 28,
-          }}
-        >
-          <Text
-            style={{
-              color: palette.mutedInk,
-              fontSize: 11,
-              letterSpacing: 3,
-              textTransform: 'uppercase',
-            }}
-          >
-            Analog
-          </Text>
-          <View
-            style={{
-              borderWidth: 1,
-              borderColor: palette.line,
-              borderRadius: 999,
-              paddingHorizontal: 12,
-              paddingVertical: 5,
-            }}
-          >
-            <Text style={{ color: palette.mutedInk, fontSize: 10, letterSpacing: 2 }}>
-              Private log
-            </Text>
-          </View>
+    <SafeAreaView style={s.safe} edges={['top']}>
+      {/* Top grid */}
+      <View style={s.topGrid}>
+        <View style={s.topLeft}>
+          <Text style={s.mono}>EST. MMXXIV</Text>
         </View>
+        <View style={s.topRight}>
+          <Text style={[s.mono, { color: recording ? C.accentRed : C.inkLight }]}>
+            {recording ? 'LISTENING' : 'SILENT'}
+          </Text>
+        </View>
+      </View>
 
-        <View
-          style={{
-            borderWidth: 1,
-            borderColor: palette.line,
-            borderRadius: 28,
-            backgroundColor: palette.paperDeep,
-            paddingHorizontal: 22,
-            paddingTop: 24,
-            paddingBottom: 28,
-            shadowColor: palette.shadow,
-            shadowOffset: { width: 0, height: 12 },
-            shadowOpacity: 0.35,
-            shadowRadius: 24,
-          }}
-        >
-          <Text
-            style={{
-              color: palette.mutedInk,
-              fontSize: 11,
-              letterSpacing: 2.4,
-              textTransform: 'uppercase',
-              marginBottom: 16,
-            }}
-          >
-            Field note 018
-          </Text>
-          <Text
-            style={{
-              color: palette.ink,
-              fontSize: 38,
-              lineHeight: 42,
-              fontFamily: 'Georgia',
-              marginBottom: 16,
-            }}
-          >
-            Speak before the day goes dim.
-          </Text>
-          <Text
-            style={{
-              color: palette.mutedInk,
-              fontSize: 16,
-              lineHeight: 24,
-              marginBottom: 34,
-            }}
-          >
-            No reply. No interruption. Just a place to leave what happened while it still
-            feels alive.
-          </Text>
-
-          <View
-            style={{
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 18,
-              height: 260,
-            }}
-          >
-            <View
-              style={{
-                position: 'absolute',
-                width: 238,
-                height: 238,
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: palette.line,
-              }}
-            />
-            <View
-              style={{
-                position: 'absolute',
-                width: 162,
-                height: 162,
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: palette.rust,
-              }}
-            />
-            {compassLines.map((line) => (
-              <View
-                key={line}
-                style={{
-                  position: 'absolute',
-                  width: 2,
-                  height: line % 3 === 0 ? 220 : 170,
-                  backgroundColor: line % 3 === 0 ? palette.ink : palette.line,
-                  transform: [{ rotate: `${line * 30}deg` }],
-                  opacity: line % 3 === 0 ? 0.55 : 0.4,
-                }}
+      {/* Center */}
+      <View style={s.center}>
+        <Animated.View style={{ transform: [{ scale: breathe }] }}>
+          <Svg width={320} height={320} viewBox="0 0 400 400" style={s.rings}>
+            {RINGS.map((ring, i) => (
+              <Circle
+                key={i}
+                cx={200}
+                cy={200}
+                r={ring.r}
+                stroke={ringColor}
+                strokeWidth={recording ? 1 : 0.5}
+                strokeDasharray={ring.dashArray}
+                fill="none"
+                opacity={ring.opacity}
               />
             ))}
-            <View
-              style={{
-                width: 88,
-                height: 88,
-                borderRadius: 999,
-                backgroundColor: palette.gold,
-                borderWidth: 3,
-                borderColor: palette.ink,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <View
-                style={{
-                  width: 18,
-                  height: 18,
-                  borderRadius: 999,
-                  backgroundColor: palette.ink,
-                }}
-              />
-            </View>
-          </View>
+          </Svg>
+        </Animated.View>
 
-          <Text
-            style={{
-              textAlign: 'center',
-              color: palette.mutedInk,
-              fontSize: 12,
-              letterSpacing: 2.2,
-              textTransform: 'uppercase',
-              marginBottom: 14,
-            }}
-          >
-            Hold to record
-          </Text>
-          <Text
-            style={{
-              textAlign: 'center',
-              color: palette.ink,
-              fontSize: 17,
-              lineHeight: 24,
-              fontFamily: 'Georgia',
-            }}
-          >
-            Today, what happened that you do not want to lose?
-          </Text>
-        </View>
-
-        <View
-          style={{
-            marginTop: 'auto',
-            paddingTop: 20,
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'flex-end',
-          }}
+        <TouchableOpacity
+          style={[s.recordBtn, recording && s.recordBtnActive]}
+          onPressIn={() => setRecording(true)}
+          onPressOut={() => setRecording(false)}
+          activeOpacity={1}
         >
-          <View>
-            <Text
-              style={{
-                color: palette.mutedInk,
-                fontSize: 11,
-                letterSpacing: 2.4,
-                textTransform: 'uppercase',
-                marginBottom: 6,
-              }}
-            >
-              Ritual
-            </Text>
-            <Text style={{ color: palette.ink, fontSize: 15, fontFamily: 'Georgia' }}>
-              Speak. Release. Archive.
-            </Text>
-          </View>
-          <Text
-            style={{
-              color: palette.rust,
-              fontSize: 12,
-              letterSpacing: 2,
-              textTransform: 'uppercase',
-            }}
-          >
-            Silent AI
-          </Text>
-        </View>
+          {!recording && <View style={s.dot} />}
+        </TouchableOpacity>
+      </View>
+
+      {/* Quote */}
+      <View style={s.quoteWrap}>
+        <Text style={s.quote}>i speak therefore i am</Text>
       </View>
     </SafeAreaView>
   );
 }
+
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: C.bgBase },
+  topGrid: {
+    flexDirection: 'row',
+    height: 60,
+    borderBottomWidth: 1,
+    borderBottomColor: C.inkDark,
+  },
+  topLeft: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    borderRightWidth: 1,
+    borderRightColor: C.inkDark,
+  },
+  topRight: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingHorizontal: 20,
+  },
+  mono: {
+    fontFamily: FONT_MONO,
+    fontSize: 10,
+    letterSpacing: 2,
+    fontWeight: '700',
+    color: C.inkDark,
+    textTransform: 'uppercase',
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rings: {
+    position: 'absolute',
+  },
+  recordBtn: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: C.inkDark,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recordBtnActive: {
+    backgroundColor: C.accentRed,
+    transform: [{ scale: 0.9 }],
+  },
+  dot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: C.accentYellow,
+  },
+  quoteWrap: {
+    paddingBottom: 40,
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  quote: {
+    fontFamily: FONT_SERIF,
+    fontStyle: 'italic',
+    fontSize: 22,
+    color: C.inkDark,
+    textAlign: 'center',
+    lineHeight: 30,
+  },
+});

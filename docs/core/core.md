@@ -3,14 +3,7 @@
 ## 北极星
 
 *I speak therefore I am.*
-
-说出来，才活过。
-你说出口的，才是真正被你经历过的。
-开口，就是留下。
-你的记忆，比你记得的更多。
-
-*You don't find yourself. You say yourself into existence.*
-*Memory isn't what happened. It's what you kept.*
+我说故我在。
 
 ---
 
