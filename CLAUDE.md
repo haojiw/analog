@@ -77,7 +77,7 @@ Add new apps to `workspaces` in root `package.json` when initialized.
 
 - `docs/core` - keeps core values and north stars
 - `docs/next-steps` - keeps next steps and future plans
-- `docs/session-notes` - keeps session notes, named yymmdd-title
+- `docs/session-notes` - keeps session notes, named yymmdd-num-title
 - `docs/principles` - coding and writing principles
 
 ---
