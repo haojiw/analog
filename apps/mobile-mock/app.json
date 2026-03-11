@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "analog-mock",
+    "slug": "analog-mock",
+    "scheme": "analog-mock",
+    "version": "0.0.1",
+    "newArchEnabled": true,
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "plugins": ["expo-router"]
+  }
+}
