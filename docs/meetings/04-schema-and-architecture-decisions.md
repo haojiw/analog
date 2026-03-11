@@ -86,9 +86,11 @@ entries (
   -- ai fields
   embedding       TEXT,               -- JSON float array, null until Phase 2
 
-  -- pipeline state
-  status          TEXT NOT NULL DEFAULT 'local',
-  -- local | uploading | uploaded | transcribing | refining | done | failed
+  -- pipeline state (split into step + error for cleaner type mapping)
+  step            TEXT NOT NULL DEFAULT 'local',
+  -- local | uploading | uploaded | transcribing | refining | done
+  error           TEXT,
+  -- null | upload_failed | transcription_failed | refining_failed
 
   -- text input fields (null when type = 'audio')
   text_content    TEXT,
@@ -103,7 +105,7 @@ entries (
 
 ```sql
 CREATE INDEX idx_entries_log_id ON entries(log_id);
-CREATE INDEX idx_entries_status ON entries(status);
+CREATE INDEX idx_entries_step ON entries(step);
 CREATE INDEX idx_logs_created_at ON logs(created_at DESC);
 ```
 
