@@ -2,6 +2,7 @@
   "private": true,
   "workspaces": [
     "apps/mobile",
+    "apps/mobile-mock",
     "packages/shared-types"
   ],
   "scripts": {
@@ -16,6 +17,7 @@
   },
   "lint-staged": {
     "apps/mobile/**/*.{ts,tsx}": "bash -c 'npx tsc --noEmit -p apps/mobile/tsconfig.json'",
+    "apps/mobile-mock/**/*.{ts,tsx}": "bash -c 'npx tsc --noEmit -p apps/mobile-mock/tsconfig.json'",
     "packages/shared-types/**/*.ts": "bash -c 'npx tsc --noEmit -p packages/shared-types/tsconfig.json'"
   }
 }
