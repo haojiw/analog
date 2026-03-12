@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "main": "expo-router/entry",
   "scripts": {
-    "start": "expo start",
+    "start": "expo start --tunnel",
     "ios": "expo start --ios",
     "android": "expo start --android"
   },

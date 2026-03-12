@@ -1,17 +1,37 @@
+import { useEffect, useRef } from 'react';
 import { Tabs } from 'expo-router';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Image, type ViewStyle } from 'react-native';
 import { RecordingProvider, useRecording } from '../../src/context/RecordingContext';
 import { theme } from '../../src/theme/tokens';
+import { textures } from '../../src/theme/textures';
 
 const C = theme.colors;
-
 function TabBar({ state, navigation }: any) {
   const { isRecording } = useRecording();
+  const fadeAnim  = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
-  if (isRecording) return null;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim,  { toValue: isRecording ? 0 : 1,  duration: 400, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: isRecording ? 10 : 0, duration: 400, useNativeDriver: true }),
+    ]).start();
+  }, [isRecording]);
 
   return (
-    <View style={s.tabBar}>
+    <Animated.View
+      style={[s.tabBar, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
+      pointerEvents={isRecording ? 'none' : 'auto'}
+    >
+      {/* WRAP THE IMAGE IN A VIEW TO HANDLE POINTER EVENTS */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Image
+          source={textures.background}
+          style={{ opacity: 0.2, width: '100%', height: '100%' }}
+          resizeMode="repeat"
+        />
+      </View>
+
       {state.routes.map((route: any, i: number) => {
         const focused = state.index === i;
         const isCenter = i === 1;
@@ -36,16 +56,21 @@ function TabBar({ state, navigation }: any) {
           </TouchableOpacity>
         );
       })}
-    </View>
+    </Animated.View>
   );
 }
 
 const s = StyleSheet.create({
   tabBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    height: 60,
-    backgroundColor: C.surface,
-    borderTopWidth: 1,
+    height: 85,
+    paddingBottom: 20,
+    backgroundColor: C.background, // Remains solid so it covers the grain when scrolling
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: C.ink,
   },
   tab: {
@@ -55,7 +80,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   tabBorderRight: {
-    borderRightWidth: 1,
+    borderRightWidth: StyleSheet.hairlineWidth,
     borderRightColor: C.ink,
   },
   dot: {
@@ -92,10 +117,33 @@ const s = StyleSheet.create({
   labelInactive: { color: C.inkFaint },
 });
 
+const transparentFill: ViewStyle = { flex: 1, backgroundColor: 'transparent' };
 export default function TabsLayout() {
   return (
     <RecordingProvider>
-      <Tabs tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
+      <Tabs 
+        tabBar={(props) => <TabBar {...props} />}
+        
+        /* This wrapper guarantees EVERY screen gets the correct bg color and grain, 
+          overriding the default React Navigation gray wall. 
+        */
+        screenLayout={({ children }) => (
+          <View style={{ flex: 1, backgroundColor: C.background }}>
+            <Image
+              source={textures.background}
+              style={[StyleSheet.absoluteFill, { opacity: 0.2, width: '100%', height: '100%' }]}
+              resizeMode="repeat"
+            />
+            {children}
+          </View>
+        )}
+        
+        screenOptions={{
+          headerShown: false,
+          // We can optionally explicitly tell the scene to be transparent too
+          sceneStyle: { backgroundColor: 'transparent' } 
+        }}
+      >
         <Tabs.Screen name="library" />
         <Tabs.Screen name="index" />
         <Tabs.Screen name="mind" />

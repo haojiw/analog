@@ -56,11 +56,15 @@ analog/                          ← repo root
 ### Running things
 
 ```bash
-# Mobile
+# Mobile (real app)
 cd apps/mobile && npx expo start -c
+
+# Mobile mock (UI sandbox) — tunnel is the default
+cd apps/mobile-mock && npm start
 
 # TypeScript check (from root)
 npx tsc --noEmit -p apps/mobile/tsconfig.json
+npx tsc --noEmit -p apps/mobile-mock/tsconfig.json
 npx tsc --noEmit -p packages/shared-types/tsconfig.json
 ```
 

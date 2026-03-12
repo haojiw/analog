@@ -2,6 +2,8 @@ import '../global.css';
 import { useEffect } from 'react';
 import { Stack, SplashScreen } from 'expo-router';
 import { useFonts } from 'expo-font';
+import { useAssets } from 'expo-asset';
+import { textures } from '../src/theme/textures';
 import {
   CormorantGaramond_400Regular,
   CormorantGaramond_400Regular_Italic,
@@ -21,11 +23,18 @@ export default function RootLayout() {
     Inter_400Regular,
   });
 
-  useEffect(() => {
-    if (fontsLoaded) SplashScreen.hideAsync();
-  }, [fontsLoaded]);
+  const [assets] = useAssets([
+    textures.background,
+    textures.button,
+  ]);
 
-  if (!fontsLoaded) return null;
+  const ready = fontsLoaded && !!assets;
+
+  useEffect(() => {
+    if (ready) SplashScreen.hideAsync();
+  }, [ready]);
+
+  if (!ready) return null;
 
   return (
     <Stack>
