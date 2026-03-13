@@ -3,19 +3,17 @@ import {
   View,
   Text,
   ScrollView,
-  Dimensions,
+  TouchableOpacity,
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg';
 import { theme } from '../../src/theme/tokens';
 
 const C = theme.colors;
 const F = theme.fonts;
-
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-const GRAPH_HEIGHT = SCREEN_HEIGHT * 0.48;
 
 // ---------------------------------------------------------------------------
 // Graph data
@@ -137,25 +135,55 @@ function InsightCard({ children }: InsightCardProps) {
 }
 
 // ---------------------------------------------------------------------------
+// MindHeader
+// ---------------------------------------------------------------------------
+
+function MindHeader() {
+  return (
+    <View style={s.header}>
+      <View style={s.headerLeft}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={s.usernameRow}
+          onPress={() => { /* TODO: open profile drawer */ }}
+        >
+          <View style={s.hamburger}>
+            <View style={s.hLine} />
+            <View style={s.hLine} />
+            <View style={s.hLine} />
+          </View>
+          <Text style={s.usernameText}>USERNAME</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={s.headerRight}>
+        <TouchableOpacity hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+          <Ionicons name="sparkles-outline" size={24} color={C.inkFaint} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // MindScreen
 // ---------------------------------------------------------------------------
 
 export default function MindScreen() {
   const { width } = useWindowDimensions();
+  const graphHeight = width * 0.85;
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      {/* Fixed knowledge graph */}
-      <View style={[s.graphContainer, { height: GRAPH_HEIGHT }]}>
-        <KnowledgeGraph width={width} height={GRAPH_HEIGHT} />
-      </View>
-
-      {/* Scrollable cards */}
+      <MindHeader />
       <ScrollView
         style={s.cardsScroll}
         contentContainerStyle={s.cardsContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Knowledge graph */}
+        <KnowledgeGraph width={width} height={graphHeight} />
+
         {/* Monthly Wrapped */}
         <InsightCard>
           <View style={s.cardHeader}>
@@ -194,9 +222,43 @@ const s = StyleSheet.create({
     backgroundColor: 'transparent',
   },
 
-  // Graph
-  graphContainer: {
-    overflow: 'hidden',
+  // Header
+  header: {
+    flexDirection: 'row',
+    paddingTop: 14,
+    paddingBottom: 16,
+    alignItems: 'flex-start',
+  },
+  headerLeft: {
+    flex: 1,
+    paddingHorizontal: 24,
+  },
+  headerRight: {
+    paddingHorizontal: 24,
+    alignItems: 'flex-end',
+  },
+  usernameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  hamburger: {
+    width: 20,
+    height: 15,
+    justifyContent: 'space-between',
+  },
+  hLine: {
+    width: 20,
+    height: 2,
+    backgroundColor: C.ink,
+    borderRadius: 1,
+  },
+  usernameText: {
+    fontFamily: F.mono,
+    fontSize: 14,
+    letterSpacing: 1.5,
+    color: C.ink,
+    textTransform: 'uppercase',
   },
 
   // Cards scroll

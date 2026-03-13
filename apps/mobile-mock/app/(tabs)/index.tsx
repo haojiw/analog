@@ -267,12 +267,12 @@ const s = StyleSheet.create({
   header: {
     flexDirection: 'row',
     paddingTop: 14,
-    paddingBottom: 10,
+    paddingBottom: 16,
     alignItems: 'flex-start',
   },
   headerLeft: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
   idleRow: {
     flexDirection: 'row',
@@ -280,13 +280,13 @@ const s = StyleSheet.create({
     gap: 9,
   },
   hamburger: {
-    width: 14,
-    height: 11,
+    width: 20,
+    height: 15,
     justifyContent: 'space-between',
   },
   hLine: {
-    width: 14,
-    height: 1.5,
+    width: 20,
+    height: 2,
     backgroundColor: C.ink,
     borderRadius: 1,
   },
@@ -306,7 +306,7 @@ const s = StyleSheet.create({
     flex: 1,
     flexDirection: 'column',
     alignItems: 'flex-end',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     gap: 4,
   },
   statusRow: {
@@ -324,15 +324,15 @@ const s = StyleSheet.create({
   // ── Typography ───────────────────────────────────────────────────────────
   mono: {
     fontFamily: F.mono,
-    fontSize: 12,
-    letterSpacing: 2,
+    fontSize: 14,
+    letterSpacing: 1.5,
     color: C.ink,
     textTransform: 'uppercase',
   },
   monoSmall: {
     fontFamily: F.mono,
-    fontSize: 10,
-    letterSpacing: 2,
+    fontSize: 11,
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
 

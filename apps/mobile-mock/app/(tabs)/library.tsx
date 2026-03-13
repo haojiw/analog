@@ -2,17 +2,15 @@ import { useState, useMemo } from 'react';
 import {
   View,
   Text,
-  SectionList,
+  ScrollView,
   TouchableOpacity,
   Modal,
-  ScrollView,
   StyleSheet,
-  SectionListRenderItemInfo,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../src/theme/tokens';
-import { mockLogs, MockLog, MOCK_TODAY } from '../../src/mocks/data';
-import { useSectionedLogs, LogSection } from '../../src/hooks/useSectionedLogs';
+import { mockLogs, MockLog } from '../../src/mocks/data';
 
 const C = theme.colors;
 const F = theme.fonts;
@@ -34,11 +32,16 @@ function formatDuration(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-  if (minutes === 0) return `${seconds}s`;
-  return `${minutes}m ${seconds}s`;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
-// Deterministic bar heights from a string id — no randomness on re-render
+function totalAudioMs(log: MockLog): number {
+  return log.entries.reduce(
+    (sum, e) => (e.type === 'audio' ? sum + e.durationMs : sum),
+    0,
+  );
+}
+
 function barsFromId(id: string, count: number): number[] {
   const bars: number[] = [];
   for (let i = 0; i < count; i++) {
@@ -46,60 +49,234 @@ function barsFromId(id: string, count: number): number[] {
     for (let j = 0; j < id.length; j++) {
       hash = (hash * 31 + id.charCodeAt(j) + i * 7) & 0xffffffff;
     }
-    // Height between 6 and 32
-    const h = 6 + (Math.abs(hash) % 27);
-    bars.push(h);
+    bars.push(6 + (Math.abs(hash) % 27));
   }
   return bars;
 }
 
 // ---------------------------------------------------------------------------
-// EntryRow
+// Grouping
 // ---------------------------------------------------------------------------
 
-type EntryRowProps = {
-  log: MockLog;
-  onPress: (log: MockLog) => void;
+type DayGroup = { date: Date; logs: MockLog[] };
+type MonthGroup = { monthLabel: string; days: DayGroup[] };
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+function groupLogs(logs: MockLog[]): MonthGroup[] {
+  const sorted = [...logs].sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+  );
+
+  const monthMap = new Map<string, Map<string, { date: Date; logs: MockLog[] }>>();
+  const monthOrder: string[] = [];
+
+  for (const log of sorted) {
+    const d = log.createdAt;
+    const monthKey = `${d.getFullYear()}-${d.getMonth()}`;
+    const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+
+    if (!monthMap.has(monthKey)) {
+      monthMap.set(monthKey, new Map());
+      monthOrder.push(monthKey);
+    }
+
+    const dayMap = monthMap.get(monthKey)!;
+    if (!dayMap.has(dayKey)) {
+      dayMap.set(dayKey, {
+        date: new Date(d.getFullYear(), d.getMonth(), d.getDate()),
+        logs: [],
+      });
+    }
+    dayMap.get(dayKey)!.logs.push(log);
+  }
+
+  return monthOrder.map((monthKey) => {
+    const [year, month] = monthKey.split('-').map(Number);
+    const dayMap = monthMap.get(monthKey)!;
+    const days = Array.from(dayMap.values()).sort(
+      (a, b) => b.date.getTime() - a.date.getTime(),
+    );
+    return { monthLabel: `${MONTH_NAMES[month]} ${year}`, days };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Mock collections
+// ---------------------------------------------------------------------------
+
+type MockCollection = {
+  id: string;
+  name: string;
+  color: string;
 };
 
-function EntryRow({ log, onPress }: EntryRowProps) {
-  const entry = log.entries[0];
-  const timeStr = formatTime(log.createdAt);
-  const metaStr =
-    entry.type === 'audio' ? formatDuration(entry.durationMs) : 'text';
+const MOCK_COLLECTIONS: MockCollection[] = [
+  { id: 'work',     name: 'Work',           color: '#7B9E87' },
+  { id: 'travel',   name: 'Travel',         color: '#9E8A7B' },
+  { id: 'growth',   name: 'Personal Growth', color: '#7B8E9E' },
+];
 
+// ---------------------------------------------------------------------------
+// LibraryHeader
+// ---------------------------------------------------------------------------
+
+function LibraryHeader() {
   return (
-    <TouchableOpacity
-      onPress={() => onPress(log)}
-      activeOpacity={0.6}
-      style={s.row}
-    >
-      <Text style={s.rowMeta}>
-        {timeStr}
-        {' · '}
-        {metaStr}
-      </Text>
-      <View style={s.rowRight}>
-        {entry.transcript != null ? (
-          <Text style={s.rowTranscript} numberOfLines={1}>
-            {entry.transcript}
-          </Text>
-        ) : (
-          <Text style={s.rowPlaceholder}>...</Text>
-        )}
+    <View style={s.header}>
+      <View style={s.headerLeft}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={s.usernameRow}
+          onPress={() => { /* TODO: open profile drawer */ }}
+        >
+          <View style={s.hamburger}>
+            <View style={s.hLine} />
+            <View style={s.hLine} />
+            <View style={s.hLine} />
+          </View>
+          <Text style={s.usernameText}>USERNAME</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={s.headerRight}>
+        <TouchableOpacity hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+          <Ionicons name="search-outline" size={24} color={C.inkFaint} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Collection chips
+// ---------------------------------------------------------------------------
+
+const CHIP_SIZE = 44;
+const CHIP_LABEL_WIDTH = 60;
+
+function FavoritesChip() {
+  return (
+    <TouchableOpacity style={s.chip} activeOpacity={0.7}>
+      <View style={s.chipSlot}>
+        <Text style={s.chipStar}>★</Text>
+      </View>
+      <Text style={s.chipLabel} numberOfLines={1}>Favorites</Text>
+    </TouchableOpacity>
+  );
+}
+
+function CollectionChip({ collection }: { collection: MockCollection }) {
+  return (
+    <TouchableOpacity style={s.chip} activeOpacity={0.7}>
+      <View style={[s.chipCircle, { backgroundColor: collection.color }]} />
+      <Text style={s.chipLabel} numberOfLines={1}>{collection.name}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function AddChip() {
+  return (
+    <TouchableOpacity style={s.chip} activeOpacity={0.7}>
+      <View style={[s.chipCircle, s.chipCircleAdd]}>
+        <Text style={s.chipAddPlus}>+</Text>
       </View>
     </TouchableOpacity>
   );
 }
 
 // ---------------------------------------------------------------------------
-// LibrarySectionHeader
+// CollectionScroll
 // ---------------------------------------------------------------------------
 
-function LibrarySectionHeader({ title }: { title: string }) {
+function CollectionScroll() {
   return (
-    <View style={s.sectionHeader}>
-      <Text style={s.sectionHeaderText}>{title}</Text>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={s.collectionScrollContent}
+    >
+      <FavoritesChip />
+      {MOCK_COLLECTIONS.map((c) => (
+        <CollectionChip key={c.id} collection={c} />
+      ))}
+      <AddChip />
+    </ScrollView>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DateSquare
+// ---------------------------------------------------------------------------
+
+function DateSquare({ day }: { day: number }) {
+  return (
+    <View style={s.dateSquare}>
+      <Text style={s.dateSquareDay}>{day}</Text>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// LogRow
+// ---------------------------------------------------------------------------
+
+type LogRowProps = {
+  log: MockLog;
+  onPress: (log: MockLog) => void;
+};
+
+function LogRow({ log, onPress }: LogRowProps) {
+  const ms = totalAudioMs(log);
+  let durationStr: string | null = null;
+
+  if (ms > 0) {
+    durationStr = formatDuration(ms);
+  } else if (log.entries.length > 0 && log.entries.every((e) => e.type === 'text')) {
+    durationStr = 'txt';
+  }
+
+  return (
+    <TouchableOpacity
+      onPress={() => onPress(log)}
+      activeOpacity={0.6}
+      style={s.logRow}
+    >
+      <Text style={s.logTitle} numberOfLines={1}>{log.title}</Text>
+      {durationStr != null && (
+        <Text style={s.durationText}>{durationStr}</Text>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DayGroupView
+// ---------------------------------------------------------------------------
+
+type DayGroupViewProps = {
+  dayGroup: DayGroup;
+  onPress: (log: MockLog) => void;
+};
+
+function DayGroupView({ dayGroup, onPress }: DayGroupViewProps) {
+  const day = dayGroup.date.getDate();
+
+  return (
+    <View style={s.dayGroup}>
+      {dayGroup.logs.map((log, index) => (
+        <View key={log.id} style={s.dayRow}>
+          {index === 0 ? (
+            <DateSquare day={day} />
+          ) : (
+            <View style={s.dateSquareSpacer} />
+          )}
+          <LogRow log={log} onPress={onPress} />
+        </View>
+      ))}
     </View>
   );
 }
@@ -132,7 +309,6 @@ function DetailOverlay({ log, onClose }: DetailOverlayProps) {
       onRequestClose={onClose}
     >
       <View style={s.overlayRoot}>
-        {/* Close button */}
         <TouchableOpacity
           style={s.overlayClose}
           onPress={onClose}
@@ -141,7 +317,6 @@ function DetailOverlay({ log, onClose }: DetailOverlayProps) {
           <Text style={s.overlayCloseText}>×</Text>
         </TouchableOpacity>
 
-        {/* Drag handle */}
         <View style={s.dragHandle} />
 
         <ScrollView
@@ -149,25 +324,19 @@ function DetailOverlay({ log, onClose }: DetailOverlayProps) {
           contentContainerStyle={s.overlayContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Time + duration header */}
           <Text style={s.overlayMeta}>
             {timeStr}
             {entry ? `  ·  ${metaStr}` : ''}
           </Text>
 
-          {/* Waveform placeholder */}
           <View style={s.waveform}>
             {bars.map((h, i) => (
-              <View
-                key={i}
-                style={[s.waveBar, { height: h }]}
-              />
+              <View key={i} style={[s.waveBar, { height: h }]} />
             ))}
           </View>
 
           <View style={s.divider} />
 
-          {/* Transcript */}
           {entry?.transcript != null ? (
             <Text style={s.overlayTranscript}>{entry.transcript}</Text>
           ) : (
@@ -178,7 +347,6 @@ function DetailOverlay({ log, onClose }: DetailOverlayProps) {
 
           <View style={s.divider} />
 
-          {/* AI section */}
           <Text style={s.insightLabel}>INSIGHT</Text>
           <Text style={s.insightBody}>Available after transcription.</Text>
         </ScrollView>
@@ -193,27 +361,30 @@ function DetailOverlay({ log, onClose }: DetailOverlayProps) {
 
 export default function LibraryScreen() {
   const [selectedLog, setSelectedLog] = useState<MockLog | null>(null);
-  const sections = useSectionedLogs(mockLogs, MOCK_TODAY);
+  const monthGroups = useMemo(() => groupLogs(mockLogs), []);
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <SectionList<MockLog, LogSection>
-        sections={sections}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }: SectionListRenderItemInfo<MockLog, LogSection>) => (
-          <EntryRow log={item} onPress={setSelectedLog} />
-        )}
-        renderSectionHeader={({ section }) => (
-          <LibrarySectionHeader title={section.title} />
-        )}
-        stickySectionHeadersEnabled={false}
-        contentContainerStyle={s.listContent}
-      />
+      <LibraryHeader />
+      <ScrollView style={s.logScroll} contentContainerStyle={s.scrollContent}>
+        <CollectionScroll />
+        {monthGroups.map((mg) => (
+          <View key={mg.monthLabel}>
+            <View style={s.monthHeader}>
+              <Text style={s.monthHeaderText}>{mg.monthLabel.toUpperCase()}</Text>
+            </View>
+            {mg.days.map((dg) => (
+              <DayGroupView
+                key={dg.date.toISOString()}
+                dayGroup={dg}
+                onPress={setSelectedLog}
+              />
+            ))}
+          </View>
+        ))}
+      </ScrollView>
 
-      <DetailOverlay
-        log={selectedLog}
-        onClose={() => setSelectedLog(null)}
-      />
+      <DetailOverlay log={selectedLog} onClose={() => setSelectedLog(null)} />
     </SafeAreaView>
   );
 }
@@ -222,56 +393,188 @@ export default function LibraryScreen() {
 // Styles
 // ---------------------------------------------------------------------------
 
+const DATE_SQUARE_SIZE = 32;
+const DATE_SQUARE_GAP = 16;
+
 const s = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: 'transparent', 
-  },
-  listContent: {
-    paddingBottom: 100,
+    backgroundColor: 'transparent',
   },
 
-  // EntryRow
-  row: {
+  // Header
+  header: {
     flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
+    paddingTop: 14,
+    paddingBottom: 16,
+    alignItems: 'flex-start',
   },
-  rowMeta: {
-    fontFamily: F.mono,
-    fontSize: 11,
-    color: C.inkFaint,
-    letterSpacing: 0.3,
-  },
-  rowRight: {
+  headerLeft: {
     flex: 1,
-    marginLeft: 12,
+    paddingHorizontal: 24,
   },
-  rowTranscript: {
+  headerRight: {
+    paddingHorizontal: 24,
+    alignItems: 'flex-end',
+  },
+  usernameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  hamburger: {
+    width: 20,
+    height: 15,
+    justifyContent: 'space-between',
+  },
+  hLine: {
+    width: 20,
+    height: 2,
+    backgroundColor: C.ink,
+    borderRadius: 1,
+  },
+  usernameText: {
+    fontFamily: F.mono,
+    fontSize: 14,
+    letterSpacing: 1.5,
+    color: C.ink,
+    textTransform: 'uppercase',
+  },
+
+  // Collection scroll
+  collectionScrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 4,
+    paddingBottom: 20,
+    gap: 16,
+  },
+
+  // Chip
+  chip: {
+    alignItems: 'center',
+    width: CHIP_LABEL_WIDTH,
+  },
+  chipSlot: {
+    width: CHIP_SIZE,
+    height: CHIP_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipStar: {
+    fontSize: 26,
+    color: C.ink,
+    lineHeight: CHIP_SIZE,
+  },
+  chipCircle: {
+    width: CHIP_SIZE,
+    height: CHIP_SIZE,
+    borderRadius: CHIP_SIZE / 2,
+  },
+  chipCircleAdd: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipAddPlus: {
     fontFamily: F.body,
-    fontSize: 13,
+    fontSize: 22,
+    color: C.inkFaint,
+    lineHeight: 26,
+  },
+  chipLabel: {
+    fontFamily: F.mono,
+    fontSize: 10,
+    color: C.inkFaint,
+    marginTop: 6,
+    maxWidth: CHIP_LABEL_WIDTH,
+    textAlign: 'center',
+  },
+
+  // Log list scroll
+  logScroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 100,
+    paddingTop: 4,
+  },
+
+  // Month header
+  monthHeader: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 12,
+  },
+  monthHeaderText: {
+    fontFamily: F.mono,
+    fontSize: 14,
+    color: C.inkFaint,
+    letterSpacing: 1.5,
+  },
+
+  // Day group
+  dayGroup: {
+    marginBottom: 6,
+  },
+  dayRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 24,
+    gap: DATE_SQUARE_GAP,
+    marginBottom: 0,
+  },
+
+  // Date square
+  dateSquare: {
+    width: DATE_SQUARE_SIZE,
+    height: DATE_SQUARE_SIZE,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    marginTop: 6,
+  },
+  dateSquareDay: {
+    fontFamily: F.mono,
+    fontSize: 14,
     color: C.ink,
     lineHeight: 18,
   },
-  rowPlaceholder: {
-    fontFamily: F.body,
-    fontSize: 13,
-    color: C.inkFaint,
+  dateSquareSpacer: {
+    width: DATE_SQUARE_SIZE,
+    height: DATE_SQUARE_SIZE,
+    flexShrink: 0,
   },
 
-  // LibrarySectionHeader
-  sectionHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 6,
+  // Log row
+  logRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 40,
+    paddingVertical: 10,
+    gap: 8,
   },
-  sectionHeaderText: {
+  logTitle: {
+    flex: 1,
+    fontFamily: F.body,
+    fontWeight: '500',
+    fontSize: 16,
+    color: C.ink,
+    lineHeight: 20,
+  },
+
+  durationText: {
     fontFamily: F.mono,
-    fontSize: 11,
+    fontSize: 12,
     color: C.inkFaint,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
+    letterSpacing: 0.2,
+    flexShrink: 0,
+    marginTop: 2,
   },
 
   // DetailOverlay
@@ -315,8 +618,6 @@ const s = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: 20,
   },
-
-  // Waveform
   waveform: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -329,13 +630,11 @@ const s = StyleSheet.create({
     backgroundColor: C.border,
     borderRadius: 1,
   },
-
   divider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: C.border,
     marginVertical: 20,
   },
-
   overlayTranscript: {
     fontFamily: F.body,
     fontSize: 15,
