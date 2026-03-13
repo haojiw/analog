@@ -14,8 +14,8 @@ const F = theme.fonts;
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 const RINGS = [
-  { r: 95,  dashArray: null,   baseOpacity: 0.55 },
-  { r: 140, dashArray: '2 5',  baseOpacity: 0.35 },
+  { r: 130,  dashArray: null,   baseOpacity: 0.55 },
+  { r: 180, dashArray: '2 5',  baseOpacity: 0.10 },
 ];
 const STAGGER = 300;
 
@@ -116,11 +116,12 @@ export default function HomeScreen() {
   // ── Interpolations ────────────────────────────────────────────────────────
   const ringColor    = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [C.ink,  C.accent]     });
   const ringWidth    = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6,    1.4]           });
-  const buttonBg     = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [C.ink,  C.background]  });
+  const buttonBg     = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [C.ink,  'transparent']  });
   const buttonBorder = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [C.ink,  C.accent]      });
   const buttonScale  = stateAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.85, 0.92]   });
   const dotColor     = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [C.gold, C.accent]      });
-  const dotSize      = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [14, 24]                });
+  const btnImgOpacity = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+  const dotSize      = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 24]                });
   const dotRadius    = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [7, 4]                  });
 
   const statusLabel = STATUS_LABEL[status] ?? 'SILENT';
@@ -224,7 +225,13 @@ export default function HomeScreen() {
                 borderWidth: isRecording ? 1 : 0,
                 transform: [{ scale: buttonScale }],
               }]}>
-                <Image source={textures.button} style={[StyleSheet.absoluteFillObject, s.btnTexture]} resizeMode="cover" />
+                <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: btnImgOpacity }]}>
+                  <Image
+                    source={textures.space}
+                    style={s.btnImg}
+                    resizeMode="contain"
+                  />
+                </Animated.View>
                 <Animated.View style={{ backgroundColor: dotColor, width: dotSize, height: dotSize, borderRadius: dotRadius }} />
               </Animated.View>
             </TouchableOpacity>
@@ -351,16 +358,17 @@ const s = StyleSheet.create({
   },
   btnFloat: {},
   recordBtn: {
-    width: 74,
-    height: 74,
-    borderRadius: 37,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  btnTexture: {
-    borderRadius: 37,
-    opacity: 0.2,
+  btnImg: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
   },
 
 

@@ -25,7 +25,7 @@ export default function RootLayout() {
 
   const [assets] = useAssets([
     textures.background,
-    textures.button,
+    textures.space,
   ]);
 
   const ready = fontsLoaded && !!assets;
