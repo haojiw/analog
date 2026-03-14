@@ -554,7 +554,6 @@ const s = StyleSheet.create({
     color: C.ink,
     lineHeight: 20,
   },
-
   durationText: {
     fontFamily: F.mono,
     fontSize: 12,

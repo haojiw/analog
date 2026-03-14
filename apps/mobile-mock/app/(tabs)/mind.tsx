@@ -3,137 +3,48 @@ import {
   View,
   Text,
   ScrollView,
-  Dimensions,
+  TouchableOpacity,
   StyleSheet,
   useWindowDimensions,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../src/theme/tokens';
-
+import { textures } from '../../src/theme/textures';
 const C = theme.colors;
 const F = theme.fonts;
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-const GRAPH_HEIGHT = SCREEN_HEIGHT * 0.48;
 
 // ---------------------------------------------------------------------------
-// Graph data
+// MindHeader
 // ---------------------------------------------------------------------------
 
-type GraphNode = {
-  id: string;
-  label: string;
-  x: number; // 0–1 relative to graph width
-  y: number; // 0–1 relative to graph height
-  weight: number; // 0–1
-};
-
-type GraphEdge = {
-  from: string;
-  to: string;
-};
-
-const NODES: GraphNode[] = [
-  { id: 'work',          label: 'work',          x: 0.50, y: 0.25, weight: 1.0  },
-  { id: 'family',        label: 'family',        x: 0.25, y: 0.55, weight: 0.8  },
-  { id: 'creativity',    label: 'creativity',    x: 0.72, y: 0.55, weight: 0.6  },
-  { id: 'anxiety',       label: 'anxiety',       x: 0.38, y: 0.78, weight: 0.5  },
-  { id: 'travel',        label: 'travel',        x: 0.65, y: 0.80, weight: 0.4  },
-  { id: 'identity',      label: 'identity',      x: 0.15, y: 0.35, weight: 0.45 },
-  { id: 'relationships', label: 'relationships', x: 0.82, y: 0.32, weight: 0.55 },
-  { id: 'health',        label: 'health',        x: 0.20, y: 0.72, weight: 0.35 },
-  { id: 'growth',        label: 'growth',        x: 0.60, y: 0.42, weight: 0.65 },
-];
-
-const EDGES: GraphEdge[] = [
-  { from: 'work',          to: 'growth'        },
-  { from: 'work',          to: 'anxiety'       },
-  { from: 'family',        to: 'relationships' },
-  { from: 'family',        to: 'health'        },
-  { from: 'creativity',    to: 'growth'        },
-  { from: 'identity',      to: 'anxiety'       },
-  { from: 'identity',      to: 'family'        },
-  { from: 'travel',        to: 'creativity'    },
-  { from: 'relationships', to: 'growth'        },
-];
-
-// ---------------------------------------------------------------------------
-// KnowledgeGraph
-// ---------------------------------------------------------------------------
-
-type KnowledgeGraphProps = {
-  width: number;
-  height: number;
-};
-
-function KnowledgeGraph({ width, height }: KnowledgeGraphProps) {
-  const nodeMap = new Map<string, GraphNode>(NODES.map((n) => [n.id, n]));
-
+function MindHeader() {
   return (
-    <Svg width={width} height={height}>
-      {/* Edges */}
-      {EDGES.map((edge) => {
-        const a = nodeMap.get(edge.from);
-        const b = nodeMap.get(edge.to);
-        if (!a || !b) return null;
-        return (
-          <Line
-            key={`${edge.from}-${edge.to}`}
-            x1={a.x * width}
-            y1={a.y * height}
-            x2={b.x * width}
-            y2={b.y * height}
-            stroke={C.border}
-            strokeWidth={1}
-          />
-        );
-      })}
-
-      {/* Nodes */}
-      {NODES.map((node) => {
-        const cx = node.x * width;
-        const cy = node.y * height;
-        const r = 8 + node.weight * 14;
-        // Opacity range: weight * 0.7 + 0.2 → [0.445, 0.9]
-        const opacity = node.weight * 0.7 + 0.2;
-
-        return (
-          <React.Fragment key={node.id}>
-            <Circle
-              cx={cx}
-              cy={cy}
-              r={r}
-              fill={C.accent}
-              opacity={opacity}
-            />
-            <SvgText
-              x={cx}
-              y={cy + r + 12}
-              textAnchor="middle"
-              fontFamily={F.body}
-              fontSize={10}
-              fill={C.inkFaint}
-            >
-              {node.label}
-            </SvgText>
-          </React.Fragment>
-        );
-      })}
-    </Svg>
+    <View style={s.header}>
+      <View style={s.headerLeft}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={s.usernameRow}
+          onPress={() => { /* TODO: open profile drawer */ }}
+        >
+          <View style={s.hamburger}>
+            <View style={s.hLine} />
+            <View style={s.hLine} />
+            <View style={s.hLine} />
+          </View>
+          <Text style={s.usernameText}>USERNAME</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={s.headerRight}>
+        <TouchableOpacity hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+          <Ionicons name="sparkles-outline" size={24} color={C.inkFaint} />
+        </TouchableOpacity>
+      </View>
+    </View>
   );
-}
-
-// ---------------------------------------------------------------------------
-// InsightCard
-// ---------------------------------------------------------------------------
-
-type InsightCardProps = {
-  children: React.ReactNode;
-};
-
-function InsightCard({ children }: InsightCardProps) {
-  return <View style={s.card}>{children}</View>;
 }
 
 // ---------------------------------------------------------------------------
@@ -142,43 +53,46 @@ function InsightCard({ children }: InsightCardProps) {
 
 export default function MindScreen() {
   const { width } = useWindowDimensions();
+  const heroHeight = width * 0.85;
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      {/* Fixed knowledge graph */}
-      <View style={[s.graphContainer, { height: GRAPH_HEIGHT }]}>
-        <KnowledgeGraph width={width} height={GRAPH_HEIGHT} />
-      </View>
-
-      {/* Scrollable cards */}
+      <MindHeader />
       <ScrollView
         style={s.cardsScroll}
         contentContainerStyle={s.cardsContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Monthly Wrapped */}
-        <InsightCard>
-          <View style={s.cardHeader}>
+        {/* Hero card */}
+        <View style={s.heroCard}>
+          <Image
+            source={textures.universe}
+            style={s.heroImage}
+            resizeMode="cover"
+          />
+        </View>
+
+        {/* Wrapped + Portrait side by side */}
+        <View style={s.row}>
+          {/* Monthly Wrapped */}
+          <View style={s.squareCard}>
             <Text style={s.cardLabel}>MARCH 2026</Text>
             <View style={s.wrappedBadge}>
               <Text style={s.wrappedBadgeText}>WRAPPED</Text>
             </View>
+            <Text style={s.insightLine}>23 entries this month.</Text>
+            <Text style={s.insightLine}>Most active Tuesday mornings.</Text>
           </View>
-          <Text style={s.insightLine}>You recorded 23 entries this month.</Text>
-          <Text style={s.insightLine}>Most active on Tuesday mornings.</Text>
-          <Text style={s.insightLine}>
-            Recurring theme: navigating uncertainty at work.
-          </Text>
-        </InsightCard>
 
-        {/* Portrait */}
-        <InsightCard>
-          <Text style={s.cardLabel}>PORTRAIT</Text>
-          <Text style={s.portraitDimension}>analytical thinker</Text>
-          <Text style={s.portraitDescription}>
-            You tend to approach problems by mapping the structure before acting.
-          </Text>
-        </InsightCard>
+          {/* Portrait */}
+          <View style={s.squareCard}>
+            <Text style={s.cardLabel}>PORTRAIT</Text>
+            <Text style={s.portraitDimension}>analytical thinker</Text>
+            <Text style={s.portraitDescription}>
+              Mapping structure before acting.
+            </Text>
+          </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -194,9 +108,43 @@ const s = StyleSheet.create({
     backgroundColor: 'transparent',
   },
 
-  // Graph
-  graphContainer: {
-    overflow: 'hidden',
+  // Header
+  header: {
+    flexDirection: 'row',
+    paddingTop: 14,
+    paddingBottom: 16,
+    alignItems: 'flex-start',
+  },
+  headerLeft: {
+    flex: 1,
+    paddingHorizontal: 24,
+  },
+  headerRight: {
+    paddingHorizontal: 24,
+    alignItems: 'flex-end',
+  },
+  usernameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  hamburger: {
+    width: 20,
+    height: 15,
+    justifyContent: 'space-between',
+  },
+  hLine: {
+    width: 20,
+    height: 2,
+    backgroundColor: C.ink,
+    borderRadius: 1,
+  },
+  usernameText: {
+    fontFamily: F.mono,
+    fontSize: 14,
+    letterSpacing: 1.5,
+    color: C.ink,
+    textTransform: 'uppercase',
   },
 
   // Cards scroll
@@ -204,24 +152,38 @@ const s = StyleSheet.create({
     flex: 1,
   },
   cardsContent: {
-    paddingTop: 12,
+    paddingTop: 5,
     paddingBottom: 100,
   },
 
-  // Card
-  card: {
-    backgroundColor: C.surface,
-    borderRadius: 12,
+  // Hero card
+  heroCard: {
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 14,
+    overflow: 'hidden',
+    height: 350,
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  // Side-by-side row
+  row: {
+    flexDirection: 'row',
     marginHorizontal: 16,
     marginBottom: 12,
-    padding: 16,
+    gap: 10,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-    gap: 8,
+  squareCard: {
+    flex: 1,
+    aspectRatio: 1,
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    padding: 14,
   },
+
   cardLabel: {
     fontFamily: F.mono,
     fontSize: 11,

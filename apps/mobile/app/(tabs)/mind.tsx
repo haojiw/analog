@@ -1,113 +1,230 @@
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import React from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  useWindowDimensions,
+  Image,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Circle, Line, Polygon, Path } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
+import { theme } from '../../src/theme/tokens';
+import { textures } from '../../src/theme/textures';
 
-const C = {
-  bgBase: '#F4F2EB',
-  inkDark: '#2C2B29',
-  inkLight: '#8A8882',
-  accentYellow: '#F4B925',
-  accentRed: '#C95233',
-};
-const FONT_MONO = Platform.OS === 'ios' ? 'Courier New' : 'monospace';
-const FONT_SERIF = Platform.OS === 'ios' ? 'Georgia' : 'serif';
+const C = theme.colors;
+const F = theme.fonts;
+
+// ---------------------------------------------------------------------------
+// MindHeader
+// ---------------------------------------------------------------------------
+
+function MindHeader() {
+  return (
+    <View style={s.header}>
+      <View style={s.headerLeft}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={s.usernameRow}
+          onPress={() => { /* TODO: open profile drawer */ }}
+        >
+          <View style={s.hamburger}>
+            <View style={s.hLine} />
+            <View style={s.hLine} />
+            <View style={s.hLine} />
+          </View>
+          <Text style={s.usernameText}>USERNAME</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={s.headerRight}>
+        <TouchableOpacity hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+          <Ionicons name="sparkles-outline" size={24} color={C.inkFaint} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MindScreen
+// ---------------------------------------------------------------------------
 
 export default function MindScreen() {
+  const { width } = useWindowDimensions();
+  const heroHeight = width * 0.85;
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
-      <View style={s.frame}>
-        <View style={s.inner}>
-          {/* Geometric background */}
-          <Svg style={StyleSheet.absoluteFillObject} viewBox="0 0 300 600" preserveAspectRatio="xMidYMid slice">
-            <Circle cx={150} cy={300} r={80} stroke={C.inkDark} strokeWidth={1} fill="none" />
-            <Circle cx={150} cy={300} r={120} stroke={C.inkDark} strokeWidth={1} fill="none" />
-            <Line x1={150} y1={0} x2={150} y2={600} stroke={C.inkDark} strokeWidth={1} />
-            <Line x1={0} y1={300} x2={300} y2={300} stroke={C.inkDark} strokeWidth={1} />
-            <Line x1={0} y1={150} x2={300} y2={450} stroke={C.inkDark} strokeWidth={1} />
-            <Line x1={300} y1={150} x2={0} y2={450} stroke={C.inkDark} strokeWidth={1} />
-            <Line x1={0} y1={0} x2={300} y2={600} stroke={C.inkDark} strokeWidth={1} />
-            <Line x1={300} y1={0} x2={0} y2={600} stroke={C.inkDark} strokeWidth={1} />
-            <Polygon points="150,180 270,300 150,420 30,300" stroke={C.accentRed} strokeWidth={1} fill="none" />
-          </Svg>
+      <MindHeader />
+      <ScrollView
+        style={s.cardsScroll}
+        contentContainerStyle={s.cardsContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero card */}
+        <View style={s.heroCard}>
+          <Image
+            source={textures.universe}
+            style={s.heroImage}
+            resizeMode="cover"
+          />
+        </View>
 
-          {/* Header */}
-          <View style={s.header}>
-            <Text style={s.mono}>THE ARCHITECT</Text>
+        {/* Wrapped + Portrait side by side */}
+        <View style={s.row}>
+          {/* Monthly Wrapped */}
+          <View style={s.squareCard}>
+            <Text style={s.cardLabel}>MARCH 2026</Text>
+            <View style={s.wrappedBadge}>
+              <Text style={s.wrappedBadgeText}>WRAPPED</Text>
+            </View>
+            <Text style={s.insightLine}>23 entries this month.</Text>
+            <Text style={s.insightLine}>Most active Tuesday mornings.</Text>
           </View>
 
-          {/* Mystic Eye */}
-          <View style={s.eyeWrap}>
-            <Svg width={100} height={50} viewBox="0 0 100 50">
-              <Path d="M0,25 Q50,-10 100,25 Q50,60 0,25 Z" fill={C.accentYellow} stroke={C.inkDark} strokeWidth={1.5} />
-              <Circle cx={50} cy={25} r={8} fill={C.inkDark} />
-            </Svg>
-          </View>
-
-          {/* Content */}
-          <View style={s.content}>
-            <Text style={[s.mono, { marginBottom: 16 }]}>PATTERN DETECTED</Text>
-            <Text style={s.insight}>
-              You speak of the ocean whenever the silence grows too long.
+          {/* Portrait */}
+          <View style={s.squareCard}>
+            <Text style={s.cardLabel}>PORTRAIT</Text>
+            <Text style={s.portraitDimension}>analytical thinker</Text>
+            <Text style={s.portraitDescription}>
+              Mapping structure before acting.
             </Text>
           </View>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
+
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.bgBase },
-  frame: {
+  safe: {
     flex: 1,
-    margin: 20,
-    borderWidth: 2,
-    borderColor: C.inkDark,
-    padding: 8,
+    backgroundColor: 'transparent',
   },
-  inner: {
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    paddingTop: 14,
+    paddingBottom: 16,
+    alignItems: 'flex-start',
+  },
+  headerLeft: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: C.inkDark,
-    overflow: 'hidden',
+    paddingHorizontal: 24,
+  },
+  headerRight: {
+    paddingHorizontal: 24,
+    alignItems: 'flex-end',
+  },
+  usernameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  hamburger: {
+    width: 20,
+    height: 15,
     justifyContent: 'space-between',
   },
-  header: {
-    alignItems: 'center',
-    paddingVertical: 20,
-    backgroundColor: C.bgBase,
-    zIndex: 3,
+  hLine: {
+    width: 20,
+    height: 2,
+    backgroundColor: C.ink,
+    borderRadius: 1,
   },
-  eyeWrap: {
-    alignItems: 'center',
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: '50%',
-    marginTop: -25,
-    zIndex: 2,
-  },
-  content: {
-    alignItems: 'center',
-    paddingHorizontal: 30,
-    paddingBottom: 40,
-    backgroundColor: C.bgBase,
-    zIndex: 3,
-  },
-  mono: {
-    fontFamily: FONT_MONO,
-    fontSize: 10,
-    letterSpacing: 2,
-    fontWeight: '700',
-    color: C.inkDark,
+  usernameText: {
+    fontFamily: F.mono,
+    fontSize: 14,
+    letterSpacing: 1.5,
+    color: C.ink,
     textTransform: 'uppercase',
   },
-  insight: {
-    fontFamily: FONT_SERIF,
-    fontStyle: 'italic',
+
+  // Cards scroll
+  cardsScroll: {
+    flex: 1,
+  },
+  cardsContent: {
+    paddingTop: 5,
+    paddingBottom: 100,
+  },
+
+  // Hero card
+  heroCard: {
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 14,
+    overflow: 'hidden',
+    height: 350,
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  // Side-by-side row
+  row: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    gap: 10,
+  },
+  squareCard: {
+    flex: 1,
+    aspectRatio: 1,
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    padding: 14,
+  },
+
+  cardLabel: {
+    fontFamily: F.mono,
+    fontSize: 11,
+    color: C.inkFaint,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    marginBottom: 10,
+  },
+  wrappedBadge: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: C.border,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginBottom: 10,
+  },
+  wrappedBadgeText: {
+    fontFamily: F.mono,
+    fontSize: 9,
+    color: C.inkFaint,
+    letterSpacing: 1,
+  },
+  insightLine: {
+    fontFamily: F.body,
+    fontSize: 13,
+    color: C.ink,
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+
+  // Portrait
+  portraitDimension: {
+    fontFamily: F.serifSemi,
     fontSize: 20,
-    color: C.inkDark,
-    textAlign: 'center',
-    lineHeight: 28,
+    color: C.ink,
+    marginBottom: 6,
+  },
+  portraitDescription: {
+    fontFamily: F.body,
+    fontSize: 13,
+    color: C.inkFaint,
+    lineHeight: 20,
   },
 });

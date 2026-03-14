@@ -23,7 +23,7 @@ export default function RootLayout() {
     Inter_400Regular,
   });
 
-  const [assets] = useAssets([textures.background, textures.button]);
+  const [assets] = useAssets([textures.background, textures.space, textures.universe]);
 
   const ready = fontsLoaded && !!assets;
 
