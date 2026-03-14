@@ -3,5 +3,6 @@
 
 export const textures = {
   background: require('../../assets/paper.webp'),
-  button:     require('../../assets/paper4.jpg'),
+  space:      require('../../assets/space4.jpg'),
+  universe:   require('../../assets/universe.jpg'),
 } as const;

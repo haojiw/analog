@@ -1,23 +1,14 @@
 import { useRef, useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, Image, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Circle } from 'react-native-svg';
 import { useVoiceManager } from '../../src/shared/hooks/useVoiceManager';
 import { theme } from '../../src/theme/tokens';
-import { textures } from '../../src/theme/textures';
 import { Ionicons } from '@expo/vector-icons';
-
+import { BreathingRing } from '../../src/shared/components/BreathingRing';
+import { RecordButton } from '../../src/shared/components/RecordButton';
 
 const C = theme.colors;
 const F = theme.fonts;
-
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
-const RINGS = [
-  { r: 95,  dashArray: null,   baseOpacity: 0.55 },
-  { r: 140, dashArray: '2 5',  baseOpacity: 0.35 },
-];
-const STAGGER = 300;
 
 function formatDate() {
   const now  = new Date();
@@ -27,13 +18,13 @@ function formatDate() {
   return `${days[now.getDay()]}, ${mm}/${dd}`;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  listening: 'LISTENING',
-  paused:    'PAUSED',
-  saving:    'SAVING...',
-  idle:      'SILENT',
-};
-const STATUS_COLOR = (status: string) => {
+function formatDuration(seconds: number): string {
+  const m   = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const sec = (seconds % 60).toString().padStart(2, '0');
+  return `${m}:${sec}`;
+}
+
+const STATUS_DOT_COLOR = (status: string) => {
   if (status === 'listening') return C.accent;
   if (status === 'paused')    return C.gold;
   return C.inkFaint;
@@ -44,8 +35,23 @@ export default function HomeScreen() {
   const [showDiscard, setShowDiscard] = useState(false);
   const dateStr = useRef(formatDate()).current;
 
-  // ── Animation values ──────────────────────────────────────────────────────
-  const stateAnim       = useRef(new Animated.Value(0)).current;
+  // ── Duration timer ─────────────────────────────────────────────────────────
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (status === 'listening') {
+      timerRef.current = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
+    }
+    if (status === 'idle') setElapsedSeconds(0);
+  }, [status]);
+
+  useEffect(() => () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+  }, []);
+
+  // ── Animation values ───────────────────────────────────────────────────────
   const quoteOpacity    = useRef(new Animated.Value(1)).current;
   const quoteY          = useRef(new Animated.Value(0)).current;
   const idleOpacity     = useRef(new Animated.Value(1)).current;
@@ -55,76 +61,46 @@ export default function HomeScreen() {
   const statusOpacity   = useRef(new Animated.Value(0)).current;
   const pauseBtnOpacity = useRef(new Animated.Value(0)).current;
   const pauseBtnY       = useRef(new Animated.Value(10)).current;
-  const ringScales      = useRef(RINGS.map(() => new Animated.Value(1))).current;
-  const ringOpacities   = useRef(RINGS.map(r => new Animated.Value(r.baseOpacity))).current;
-  const timeoutRefs     = useRef<NodeJS.Timeout[]>([]);
+  const savedAnim       = useRef(new Animated.Value(0)).current;
 
+  // ── Saved badge animation ──────────────────────────────────────────────────
   useEffect(() => {
-    Animated.timing(stateAnim, {
-      toValue: isRecording ? 1 : 0,
-      duration: 400,
-      easing: Easing.bezier(0.4, 0, 0.2, 1),
-      useNativeDriver: false,
-    }).start();
-
-    Animated.parallel([
-      Animated.timing(quoteOpacity,    { toValue: isRecording ? 0 : 1,  duration: 400, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-      Animated.timing(quoteY,          { toValue: isRecording ? 10 : 0, duration: 400, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-      Animated.timing(idleOpacity,     { toValue: isRecording ? 0 : 1,  duration: 300, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-      Animated.timing(idleY,           { toValue: isRecording ? -10 : 0, duration: 300, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-      Animated.timing(closeOpacity,    { toValue: isRecording ? 1 : 0,  duration: 300, delay: isRecording ? 180 : 0, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-      Animated.timing(closeY,          { toValue: isRecording ? 0 : 10, duration: 300, delay: isRecording ? 180 : 0, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-      Animated.timing(statusOpacity,   { toValue: isRecording ? 1 : 0,  duration: 300, delay: isRecording ? 100 : 0, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-      Animated.timing(pauseBtnOpacity, { toValue: isRecording ? 1 : 0,  duration: 300, delay: isRecording ? 200 : 0, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-      Animated.timing(pauseBtnY,       { toValue: isRecording ? 0 : 10, duration: 300, delay: isRecording ? 200 : 0, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-    ]).start();
-
-    if (isRecording) {
-      ringScales.forEach((scale, i) => {
-        const t = setTimeout(() => {
-          Animated.loop(
-            Animated.sequence([
-              Animated.parallel([
-                Animated.timing(scale,            { toValue: 1.10,                 duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-                Animated.timing(ringOpacities[i], { toValue: 0.15,                 duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-              ]),
-              Animated.parallel([
-                Animated.timing(scale,            { toValue: 1.0,                  duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-                Animated.timing(ringOpacities[i], { toValue: RINGS[i].baseOpacity, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-              ]),
-            ])
-          ).start();
-        }, i * STAGGER);
-        timeoutRefs.current.push(t);
-      });
-    } else {
-      timeoutRefs.current.forEach(clearTimeout);
-      timeoutRefs.current = [];
-      ringScales.forEach((scale, i) => {
-        scale.stopAnimation();
-        ringOpacities[i].stopAnimation();
-        Animated.parallel([
-          Animated.spring(scale,            { toValue: 1,                    useNativeDriver: true, speed: 20 }),
-          Animated.timing(ringOpacities[i], { toValue: RINGS[i].baseOpacity, duration: 300,         useNativeDriver: true }),
-        ]).start();
-      });
+    if (status === 'saving') {
+      savedAnim.setValue(0);
+      Animated.sequence([
+        Animated.delay(200),
+        Animated.timing(savedAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.delay(1000),
+        Animated.timing(savedAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+      ]).start();
     }
+  }, [status]);
 
-    return () => timeoutRefs.current.forEach(clearTimeout);
+  // Reset timer and cancel saved badge when a new recording session begins
+  useEffect(() => {
+    if (isRecording) {
+      setElapsedSeconds(0);
+      savedAnim.stopAnimation();
+      savedAnim.setValue(0);
+    }
   }, [isRecording]);
 
-  // ── Interpolations ────────────────────────────────────────────────────────
-  const ringColor    = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [C.ink,  C.accent]     });
-  const ringWidth    = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6,    1.4]           });
-  const buttonBg     = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [C.ink,  C.background]  });
-  const buttonBorder = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [C.ink,  C.accent]      });
-  const buttonScale  = stateAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.85, 0.92]   });
-  const dotColor     = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [C.gold, C.accent]      });
-  const dotSize      = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [14, 24]                });
-  const dotRadius    = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [7, 4]                  });
+  // ── Header + chrome animations ─────────────────────────────────────────────
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(quoteOpacity,    { toValue: isRecording ? 0 : 1,   duration: 400, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      Animated.timing(quoteY,          { toValue: isRecording ? 10 : 0,  duration: 400, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      Animated.timing(idleOpacity,     { toValue: isRecording ? 0 : 1,   duration: 300, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      Animated.timing(idleY,           { toValue: isRecording ? -10 : 0, duration: 300, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      Animated.timing(closeOpacity,    { toValue: isRecording ? 1 : 0,   duration: 300, delay: isRecording ? 180 : 0, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      Animated.timing(closeY,          { toValue: isRecording ? 0 : 10,  duration: 300, delay: isRecording ? 180 : 0, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      Animated.timing(statusOpacity,   { toValue: isRecording ? 1 : 0,   duration: 300, delay: isRecording ? 100 : 0, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      Animated.timing(pauseBtnOpacity, { toValue: isRecording ? 1 : 0,   duration: 300, delay: isRecording ? 200 : 0, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      Animated.timing(pauseBtnY,       { toValue: isRecording ? 0 : 10,  duration: 300, delay: isRecording ? 200 : 0, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+    ]).start();
+  }, [isRecording]);
 
-  const statusLabel = STATUS_LABEL[status] ?? 'SILENT';
-  const statusColor = STATUS_COLOR(status);
+  const statusDotColor = STATUS_DOT_COLOR(status);
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
@@ -152,7 +128,7 @@ export default function HomeScreen() {
 
         {/* Left */}
         <View style={s.headerLeft}>
-          {/* Idle: hamburger + username — wrapped in TouchableOpacity for future profile drawer */}
+          {/* Idle: hamburger + username */}
           <Animated.View
             style={{ opacity: idleOpacity, transform: [{ translateY: idleY }] }}
             pointerEvents={isRecording ? 'none' : 'auto'}
@@ -183,13 +159,21 @@ export default function HomeScreen() {
           </Animated.View>
         </View>
 
-        {/* Right: date always, status flows in beneath */}
+        {/* Right: date always, status slot beneath */}
         <View style={s.headerRight}>
           <Text style={s.mono}>{dateStr}</Text>
-          <Animated.View style={[s.statusRow, { opacity: statusOpacity }]} pointerEvents="none">
-            <View style={[s.statusDot, { backgroundColor: isRecording ? statusColor : 'transparent', borderWidth: isRecording ? 0 : 1 }]} />
-            <Text style={[s.monoSmall, { color: statusColor }]}>{statusLabel}</Text>
-          </Animated.View>
+          <View style={s.statusSlot}>
+            {/* Timer row — visible while recording */}
+            <Animated.View style={[s.statusRow, { opacity: statusOpacity }]} pointerEvents="none">
+              <View style={[s.statusDot, { backgroundColor: statusDotColor }]} />
+              <Text style={[s.timerText, { color: statusDotColor }]}>{formatDuration(elapsedSeconds)}</Text>
+            </Animated.View>
+            {/* SAVED badge — overlaid, fades in after recording stops */}
+            <Animated.View style={[s.statusRow, s.savedOverlay, { opacity: savedAnim }]} pointerEvents="none">
+              <View style={[s.statusDot, { backgroundColor: '#4CAF50' }]} />
+              <Text style={[s.timerText, { color: '#4CAF50' }]}>SAVED</Text>
+            </Animated.View>
+          </View>
         </View>
 
       </View>
@@ -197,42 +181,11 @@ export default function HomeScreen() {
       {/* ── Center stage ── */}
       <View style={s.center}>
         <View style={s.stage}>
-
-          {RINGS.map((ring, i) => (
-            <Animated.View
-              key={i}
-              style={[StyleSheet.absoluteFill, { transform: [{ scale: ringScales[i] }], opacity: ringOpacities[i] }]}
-              pointerEvents="none"
-            >
-              <Svg width="100%" height="100%" viewBox="0 0 400 400">
-                <AnimatedCircle
-                  cx={200} cy={200} r={ring.r}
-                  stroke={ringColor}
-                  strokeWidth={ringWidth}
-                  strokeDasharray={ring.dashArray ?? undefined}
-                  fill="none"
-                />
-              </Svg>
-            </Animated.View>
-          ))}
-
-          <View style={s.btnFloat}>
-            <TouchableOpacity onPress={toggleRecord} activeOpacity={0.9}>
-              <Animated.View style={[s.recordBtn, {
-                backgroundColor: buttonBg,
-                borderColor: buttonBorder,
-                borderWidth: isRecording ? 1 : 0,
-                transform: [{ scale: buttonScale }],
-              }]}>
-                <Image source={textures.button} style={[StyleSheet.absoluteFillObject, s.btnTexture]} resizeMode="cover" />
-                <Animated.View style={{ backgroundColor: dotColor, width: dotSize, height: dotSize, borderRadius: dotRadius }} />
-              </Animated.View>
-            </TouchableOpacity>
-          </View>
-
+          <BreathingRing isRecording={isRecording} />
+          <RecordButton isRecording={isRecording} onPress={toggleRecord} />
         </View>
       </View>
-    
+
       {/* ── Pause / Resume ── */}
       <View style={s.pauseArea}>
         <Animated.View style={{ opacity: pauseBtnOpacity, transform: [{ translateY: pauseBtnY }] }}>
@@ -252,7 +205,7 @@ export default function HomeScreen() {
       <Animated.View style={[s.quoteWrap, { opacity: quoteOpacity, transform: [{ translateY: quoteY }] }]}>
         <Text style={s.quote}>i speak therefore i am</Text>
       </Animated.View>
-      
+
     </SafeAreaView>
   );
 }
@@ -263,16 +216,16 @@ const s = StyleSheet.create({
     backgroundColor: 'transparent',
   },
 
-  // ── Header ──────────────────────────────────────────────────────────────
+  // ── Header ────────────────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     paddingTop: 14,
-    paddingBottom: 10,
+    paddingBottom: 16,
     alignItems: 'flex-start',
   },
   headerLeft: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
   idleRow: {
     flexDirection: 'row',
@@ -280,13 +233,13 @@ const s = StyleSheet.create({
     gap: 9,
   },
   hamburger: {
-    width: 14,
-    height: 11,
+    width: 20,
+    height: 15,
     justifyContent: 'space-between',
   },
   hLine: {
-    width: 14,
-    height: 1.5,
+    width: 20,
+    height: 2,
     backgroundColor: C.ink,
     borderRadius: 1,
   },
@@ -301,46 +254,54 @@ const s = StyleSheet.create({
     color: C.ink,
     lineHeight: 48,
   },
-
   headerRight: {
     flex: 1,
     flexDirection: 'column',
     alignItems: 'flex-end',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     gap: 4,
+  },
+  statusSlot: {
+    position: 'relative',
+    alignItems: 'flex-end',
   },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 8,
+  },
+  savedOverlay: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
   statusDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     borderColor: C.inkFaint,
   },
 
-  // ── Typography ───────────────────────────────────────────────────────────
+  // ── Typography ─────────────────────────────────────────────────────────────
   mono: {
     fontFamily: F.mono,
-    fontSize: 12,
-    letterSpacing: 2,
+    fontSize: 14,
+    letterSpacing: 1.5,
     color: C.ink,
     textTransform: 'uppercase',
   },
-  monoSmall: {
+  timerText: {
     fontFamily: F.mono,
-    fontSize: 10,
+    fontSize: 18,
     letterSpacing: 2,
     textTransform: 'uppercase',
   },
 
-  // ── Center stage ─────────────────────────────────────────────────────────
+  // ── Center stage ───────────────────────────────────────────────────────────
   center: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center', // Anchors to the true middle
+    justifyContent: 'center',
     top: 80,
   },
   stage: {
@@ -349,22 +310,8 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnFloat: {},
-  recordBtn: {
-    width: 74,
-    height: 74,
-    borderRadius: 37,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  btnTexture: {
-    borderRadius: 37,
-    opacity: 0.2,
-  },
 
-
-  // ── Pause button ──────────────────────────────────────────────────────────
+  // ── Pause button ───────────────────────────────────────────────────────────
   pauseArea: {
     position: 'absolute',
     bottom: 80,
@@ -379,7 +326,7 @@ const s = StyleSheet.create({
     padding: 10,
   },
 
-  // ── Quote ─────────────────────────────────────────────────────────────────
+  // ── Quote ──────────────────────────────────────────────────────────────────
   quoteWrap: {
     paddingBottom: 120,
     alignItems: 'center',
@@ -393,7 +340,7 @@ const s = StyleSheet.create({
     lineHeight: 28,
   },
 
-  // ── Discard modal ─────────────────────────────────────────────────────────
+  // ── Discard modal ──────────────────────────────────────────────────────────
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',

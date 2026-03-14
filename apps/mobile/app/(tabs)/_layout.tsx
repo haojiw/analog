@@ -6,6 +6,46 @@ import { theme } from '../../src/theme/tokens';
 import { textures } from '../../src/theme/textures';
 
 const C = theme.colors;
+const F = theme.fonts;
+
+// ---------------------------------------------------------------------------
+// Tab icons
+// ---------------------------------------------------------------------------
+
+// Square outline with a horizontal divider through the middle
+function LibraryIcon({ color }: { color: string }) {
+  return (
+    <View style={[s.libSquare, { borderColor: color }]}>
+      <View style={[s.libLine, { backgroundColor: color }]} />
+    </View>
+  );
+}
+
+// Outer ring + tiny center dot — orbital / universe
+function MindIcon({ color }: { color: string }) {
+  return (
+    <View style={[s.mindRing, { borderColor: color }]}>
+      <View style={[s.mindDot, { backgroundColor: color }]} />
+    </View>
+  );
+}
+
+// Two concentric rings — iPhone home button
+function HomeIcon() {
+  const color = C.inkFaint;
+  return (
+    <View style={[s.homeOuter, { borderColor: color }]}>
+      <View style={[s.homeInner, { borderColor: color }]} />
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TabBar
+// ---------------------------------------------------------------------------
+
+const TAB_LABELS = ['LIBRARY', 'HOME', 'MIND'];
+
 function TabBar({ state, navigation }: any) {
   const { isRecording } = useRecording();
   const fadeAnim  = useRef(new Animated.Value(1)).current;
@@ -23,7 +63,6 @@ function TabBar({ state, navigation }: any) {
       style={[s.tabBar, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}
       pointerEvents={isRecording ? 'none' : 'auto'}
     >
-      {/* WRAP THE IMAGE IN A VIEW TO HANDLE POINTER EVENTS */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         <Image
           source={textures.background}
@@ -35,22 +74,26 @@ function TabBar({ state, navigation }: any) {
       {state.routes.map((route: any, i: number) => {
         const focused = state.index === i;
         const isCenter = i === 1;
+        const color = focused ? C.ink : C.inkFaint;
 
         return (
           <TouchableOpacity
             key={route.key}
-            style={[s.tab, i < state.routes.length - 1 && s.tabBorderRight]}
+            style={s.tab}
             onPress={() => navigation.navigate(route.name)}
             activeOpacity={0.7}
           >
             {isCenter ? (
-              <View style={[s.centerDot, focused && s.centerDotActive]} />
+              <HomeIcon />
+            ) : i === 0 ? (
+              <>
+                <LibraryIcon color={color} />
+                <Text style={[s.label, { color }]}>{TAB_LABELS[i]}</Text>
+              </>
             ) : (
               <>
-                <View style={[s.dot, focused && s.dotActive]} />
-                <Text style={[s.label, focused ? s.labelActive : s.labelInactive]}>
-                  {i === 0 ? 'NOTES' : 'MIND'}
-                </Text>
+                <MindIcon color={color} />
+                <Text style={[s.label, { color }]}>{TAB_LABELS[i]}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -60,6 +103,10 @@ function TabBar({ state, navigation }: any) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
+
 const s = StyleSheet.create({
   tabBar: {
     position: 'absolute',
@@ -68,65 +115,80 @@ const s = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     height: 85,
-    paddingBottom: 20,
-    backgroundColor: C.background, // Remains solid so it covers the grain when scrolling
+    paddingBottom: 10,
+    paddingHorizontal: 25,
+    backgroundColor: C.background,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: C.ink,
   },
   tab: {
     flex: 1,
-    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 12,
+    gap: 4,
+  },
+
+  // Library: square outline + horizontal divider
+  libSquare: {
+    marginVertical: 2,
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderRadius: 1,
+    justifyContent: 'center',
+  },
+  libLine: {
+    height: 2,
+  },
+
+  // Mind: outer ring + center dot
+  mindRing: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tabBorderRight: {
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: C.ink,
+  mindDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
   },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    backgroundColor: 'transparent',
-    marginRight: 8,
-  },
-  dotActive: {
-    backgroundColor: C.accent,
-    borderColor: C.ink,
-  },
-  centerDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+
+  // Home: two concentric rings (iPhone home button)
+  homeOuter: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     borderWidth: 1.5,
-    borderColor: C.inkFaint,
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  homeInner: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 0.8,
     backgroundColor: 'transparent',
   },
-  centerDotActive: {
-    backgroundColor: C.gold,
-    borderColor: C.ink,
-  },
+
   label: {
-    fontFamily: theme.fonts.mono,
-    fontSize: 10,
-    letterSpacing: 1.5,
+    fontFamily: F.mono,
+    fontSize: 8,
+    letterSpacing: 1,
   },
-  labelActive: { color: C.ink },
-  labelInactive: { color: C.inkFaint },
 });
 
 const transparentFill: ViewStyle = { flex: 1, backgroundColor: 'transparent' };
+
 export default function TabsLayout() {
   return (
     <RecordingProvider>
-      <Tabs 
+      <Tabs
         tabBar={(props) => <TabBar {...props} />}
-        
-        /* This wrapper guarantees EVERY screen gets the correct bg color and grain, 
-          overriding the default React Navigation gray wall. 
-        */
         screenLayout={({ children }) => (
           <View style={{ flex: 1, backgroundColor: C.background }}>
             <Image
@@ -137,14 +199,12 @@ export default function TabsLayout() {
             {children}
           </View>
         )}
-        
         screenOptions={{
           headerShown: false,
-          // We can optionally explicitly tell the scene to be transparent too
-          sceneStyle: { backgroundColor: 'transparent' } 
+          sceneStyle: { backgroundColor: 'transparent' },
         }}
       >
-        <Tabs.Screen name="notes" />
+        <Tabs.Screen name="library" />
         <Tabs.Screen name="index" />
         <Tabs.Screen name="mind" />
       </Tabs>
