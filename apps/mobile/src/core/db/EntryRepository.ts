@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import type { Entry, NewEntry, EntryStep, EntryError } from '@analog/shared-types';
+import { generateUUID } from '../../shared/utils/uuid';
 
 type EntryRow = {
   id: string;
@@ -47,7 +48,7 @@ export async function insertEntry(
   db: SQLite.SQLiteDatabase,
   newEntry: NewEntry
 ): Promise<Entry> {
-  const id = crypto.randomUUID();
+  const id = generateUUID();
   const now = Date.now();
   const step: EntryStep = 'local';
   await db.runAsync(

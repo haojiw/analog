@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../src/theme/tokens';
-import { mockLogs, MockLog } from '../../src/mocks/data';
+import { useLibraryLogs, LibraryLog } from '../../src/shared/hooks/useLibraryLogs';
 
 const C = theme.colors;
 const F = theme.fonts;
@@ -35,7 +35,7 @@ function formatDuration(ms: number): string {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
-function totalAudioMs(log: MockLog): number {
+function totalAudioMs(log: LibraryLog): number {
   return log.entries.reduce(
     (sum, e) => (e.type === 'audio' ? sum + e.durationMs : sum),
     0,
@@ -58,7 +58,7 @@ function barsFromId(id: string, count: number): number[] {
 // Grouping
 // ---------------------------------------------------------------------------
 
-type DayGroup = { date: Date; logs: MockLog[] };
+type DayGroup = { date: Date; logs: LibraryLog[] };
 type MonthGroup = { monthLabel: string; days: DayGroup[] };
 
 const MONTH_NAMES = [
@@ -66,12 +66,12 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-function groupLogs(logs: MockLog[]): MonthGroup[] {
+function groupLogs(logs: LibraryLog[]): MonthGroup[] {
   const sorted = [...logs].sort(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
   );
 
-  const monthMap = new Map<string, Map<string, { date: Date; logs: MockLog[] }>>();
+  const monthMap = new Map<string, Map<string, { date: Date; logs: LibraryLog[] }>>();
   const monthOrder: string[] = [];
 
   for (const log of sorted) {
@@ -223,8 +223,8 @@ function DateSquare({ day }: { day: number }) {
 // ---------------------------------------------------------------------------
 
 type LogRowProps = {
-  log: MockLog;
-  onPress: (log: MockLog) => void;
+  log: LibraryLog;
+  onPress: (log: LibraryLog) => void;
 };
 
 function LogRow({ log, onPress }: LogRowProps) {
@@ -257,7 +257,7 @@ function LogRow({ log, onPress }: LogRowProps) {
 
 type DayGroupViewProps = {
   dayGroup: DayGroup;
-  onPress: (log: MockLog) => void;
+  onPress: (log: LibraryLog) => void;
 };
 
 function DayGroupView({ dayGroup, onPress }: DayGroupViewProps) {
@@ -284,7 +284,7 @@ function DayGroupView({ dayGroup, onPress }: DayGroupViewProps) {
 // ---------------------------------------------------------------------------
 
 type DetailOverlayProps = {
-  log: MockLog | null;
+  log: LibraryLog | null;
   onClose: () => void;
 };
 
@@ -358,8 +358,9 @@ function DetailOverlay({ log, onClose }: DetailOverlayProps) {
 // ---------------------------------------------------------------------------
 
 export default function LibraryScreen() {
-  const [selectedLog, setSelectedLog] = useState<MockLog | null>(null);
-  const monthGroups = useMemo(() => groupLogs(mockLogs), []);
+  const { logs } = useLibraryLogs();
+  const [selectedLog, setSelectedLog] = useState<LibraryLog | null>(null);
+  const monthGroups = useMemo(() => groupLogs(logs), [logs]);
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>

@@ -1,6 +1,7 @@
 import "../global.css";
 import { useEffect } from "react";
 import { Stack, SplashScreen } from "expo-router";
+import { getDb } from "../src/core/db/db";
 import { useFonts } from "expo-font";
 import { useAssets } from "expo-asset";
 import { textures } from "../src/theme/textures";
@@ -26,6 +27,8 @@ export default function RootLayout() {
   const [assets] = useAssets([textures.background, textures.space, textures.universe]);
 
   const ready = fontsLoaded && !!assets;
+
+  useEffect(() => { getDb(); }, []);
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync();

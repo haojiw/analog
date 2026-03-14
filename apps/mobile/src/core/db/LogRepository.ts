@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import type { Log, NewLog } from '@analog/shared-types';
+import { generateUUID } from '../../shared/utils/uuid';
 
 type LogRow = {
   id: string;
@@ -18,7 +19,7 @@ function rowToLog(row: LogRow): Log {
 }
 
 export async function insertLog(db: SQLite.SQLiteDatabase, newLog: NewLog): Promise<Log> {
-  const id = crypto.randomUUID();
+  const id = generateUUID();
   const now = Date.now();
   await db.runAsync(
     'INSERT INTO logs (id, user_id, created_at, updated_at) VALUES (?, ?, ?, ?)',
