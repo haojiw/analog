@@ -56,9 +56,13 @@ export default function HomeScreen() {
     if (status === 'idle') setElapsedSeconds(0);
   }, [status]);
 
-  // Reset timer whenever a new recording session begins
+  // Reset timer and cancel any saved badge when a new recording session begins
   useEffect(() => {
-    if (isRecording) setElapsedSeconds(0);
+    if (isRecording) {
+      setElapsedSeconds(0);
+      savedAnim.stopAnimation();
+      savedAnim.setValue(0);
+    }
   }, [isRecording]);
 
   useEffect(() => () => {
