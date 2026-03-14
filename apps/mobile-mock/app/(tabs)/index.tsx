@@ -13,11 +13,11 @@ const F = theme.fonts;
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-const RINGS = [
-  { r: 130,  dashArray: null,   baseOpacity: 0.55 },
-  { r: 180, dashArray: '2 5',  baseOpacity: 0.10 },
-];
-const STAGGER = 300;
+// Single ring — radius in SVG units (viewBox 400×400 over 340px stage)
+const RING_IDLE_R   = 112;  // tight to button in idle
+const RING_NEAR_R   = 130;  // breathe-in position while recording
+const RING_FAR_R    = 180;  // breathe-out position while recording
+const RING_OPACITY  = 0.30;
 
 function formatDate() {
   const now  = new Date();
@@ -27,13 +27,13 @@ function formatDate() {
   return `${days[now.getDay()]}, ${mm}/${dd}`;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  listening: 'LISTENING',
-  paused:    'PAUSED',
-  saving:    'SAVING...',
-  idle:      'SILENT',
-};
-const STATUS_COLOR = (status: string) => {
+function formatDuration(seconds: number): string {
+  const m   = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const sec = (seconds % 60).toString().padStart(2, '0');
+  return `${m}:${sec}`;
+}
+
+const STATUS_DOT_COLOR = (status: string) => {
   if (status === 'listening') return C.accent;
   if (status === 'paused')    return C.gold;
   return C.inkFaint;
@@ -43,6 +43,27 @@ export default function HomeScreen() {
   const { status, isRecording, toggleRecord, togglePause, discard } = useVoiceManager();
   const [showDiscard, setShowDiscard] = useState(false);
   const dateStr = useRef(formatDate()).current;
+
+  // ── Duration timer ─────────────────────────────────────────────────────────
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (status === 'listening') {
+      timerRef.current = setInterval(() => setElapsedSeconds(s => s + 1), 1000);
+    }
+    if (status === 'idle') setElapsedSeconds(0);
+  }, [status]);
+
+  // Reset timer whenever a new recording session begins
+  useEffect(() => {
+    if (isRecording) setElapsedSeconds(0);
+  }, [isRecording]);
+
+  useEffect(() => () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+  }, []);
 
   // ── Animation values ──────────────────────────────────────────────────────
   const stateAnim       = useRef(new Animated.Value(0)).current;
@@ -55,9 +76,23 @@ export default function HomeScreen() {
   const statusOpacity   = useRef(new Animated.Value(0)).current;
   const pauseBtnOpacity = useRef(new Animated.Value(0)).current;
   const pauseBtnY       = useRef(new Animated.Value(10)).current;
-  const ringScales      = useRef(RINGS.map(() => new Animated.Value(1))).current;
-  const ringOpacities   = useRef(RINGS.map(r => new Animated.Value(r.baseOpacity))).current;
-  const timeoutRefs     = useRef<NodeJS.Timeout[]>([]);
+  const ringR           = useRef(new Animated.Value(RING_IDLE_R)).current;
+  const ringOpacity     = useRef(new Animated.Value(RING_OPACITY)).current;
+  const breathingActive = useRef(false);
+  const savedAnim       = useRef(new Animated.Value(0)).current;
+
+  // ── Saved badge animation ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (status === 'saving') {
+      savedAnim.setValue(0);
+      Animated.sequence([
+        Animated.delay(200), // let timer row fade out first
+        Animated.timing(savedAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.delay(1000),
+        Animated.timing(savedAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [status]);
 
   useEffect(() => {
     Animated.timing(stateAnim, {
@@ -80,52 +115,49 @@ export default function HomeScreen() {
     ]).start();
 
     if (isRecording) {
-      ringScales.forEach((scale, i) => {
-        const t = setTimeout(() => {
-          Animated.loop(
-            Animated.sequence([
-              Animated.parallel([
-                Animated.timing(scale,            { toValue: 1.10,                 duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-                Animated.timing(ringOpacities[i], { toValue: 0.15,                 duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-              ]),
-              Animated.parallel([
-                Animated.timing(scale,            { toValue: 1.0,                  duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-                Animated.timing(ringOpacities[i], { toValue: RINGS[i].baseOpacity, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-              ]),
-            ])
-          ).start();
-        }, i * STAGGER);
-        timeoutRefs.current.push(t);
-      });
-    } else {
-      timeoutRefs.current.forEach(clearTimeout);
-      timeoutRefs.current = [];
-      ringScales.forEach((scale, i) => {
-        scale.stopAnimation();
-        ringOpacities[i].stopAnimation();
-        Animated.parallel([
-          Animated.spring(scale,            { toValue: 1,                    useNativeDriver: true, speed: 20 }),
-          Animated.timing(ringOpacities[i], { toValue: RINGS[i].baseOpacity, duration: 300,         useNativeDriver: true }),
-        ]).start();
-      });
-    }
+      breathingActive.current = true;
 
-    return () => timeoutRefs.current.forEach(clearTimeout);
+      const breathe = () => {
+        if (!breathingActive.current) return;
+        Animated.sequence([
+          Animated.parallel([
+            Animated.timing(ringR,       { toValue: RING_FAR_R,  duration: 4000, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+            Animated.timing(ringOpacity, { toValue: 0.08,        duration: 4000, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+          ]),
+          Animated.parallel([
+            Animated.timing(ringR,       { toValue: RING_NEAR_R,  duration: 5500, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+            Animated.timing(ringOpacity, { toValue: RING_OPACITY, duration: 5500, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+          ]),
+        ]).start(({ finished }) => { if (finished) breathe(); });
+      };
+
+      Animated.spring(ringR, { toValue: RING_NEAR_R, speed: 18, bounciness: 3, useNativeDriver: false })
+        .start(() => breathe());
+    } else {
+      breathingActive.current = false;
+      ringR.stopAnimation();
+      ringOpacity.stopAnimation();
+      Animated.parallel([
+        Animated.timing(ringR,       { toValue: RING_IDLE_R,  duration: 400, easing: Easing.out(Easing.ease), useNativeDriver: false }),
+        Animated.timing(ringOpacity, { toValue: RING_OPACITY, duration: 400,                                  useNativeDriver: false }),
+      ]).start();
+    }
   }, [isRecording]);
 
   // ── Interpolations ────────────────────────────────────────────────────────
-  const ringColor    = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [C.ink,  C.accent]     });
+  const ringColor    = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [C.ink,  C.border]     });
   const ringWidth    = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6,    1.4]           });
   const buttonBg     = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [C.ink,  'transparent']  });
   const buttonBorder = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [C.ink,  C.accent]      });
-  const buttonScale  = stateAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.85, 0.92]   });
+  // Animate actual width/height so the touch area shrinks with the visual
+  const buttonSize   = stateAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [180, 68, 81]  });
+  const buttonRadius = stateAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [90,  34, 40.5] });
   const dotColor     = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [C.gold, C.accent]      });
   const btnImgOpacity = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
-  const dotSize      = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 24]                });
-  const dotRadius    = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [7, 4]                  });
+  const dotSize      = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 30]                });
+  const dotRadius    = stateAnim.interpolate({ inputRange: [0, 1], outputRange: [6, 6]                  });
 
-  const statusLabel = STATUS_LABEL[status] ?? 'SILENT';
-  const statusColor = STATUS_COLOR(status);
+  const statusDotColor = STATUS_DOT_COLOR(status);
 
   return (
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
@@ -184,13 +216,21 @@ export default function HomeScreen() {
           </Animated.View>
         </View>
 
-        {/* Right: date always, status flows in beneath */}
+        {/* Right: date always, status slot beneath */}
         <View style={s.headerRight}>
           <Text style={s.mono}>{dateStr}</Text>
-          <Animated.View style={[s.statusRow, { opacity: statusOpacity }]} pointerEvents="none">
-            <View style={[s.statusDot, { backgroundColor: isRecording ? statusColor : 'transparent', borderWidth: isRecording ? 0 : 1 }]} />
-            <Text style={[s.monoSmall, { color: statusColor }]}>{statusLabel}</Text>
-          </Animated.View>
+          <View style={s.statusSlot}>
+            {/* Timer row — visible while recording */}
+            <Animated.View style={[s.statusRow, { opacity: statusOpacity }]} pointerEvents="none">
+              <View style={[s.statusDot, { backgroundColor: statusDotColor }]} />
+              <Text style={[s.timerText, { color: statusDotColor }]}>{formatDuration(elapsedSeconds)}</Text>
+            </Animated.View>
+            {/* SAVED row — overlaid, fades in after recording stops */}
+            <Animated.View style={[s.statusRow, s.savedOverlay, { opacity: savedAnim }]} pointerEvents="none">
+              <View style={[s.statusDot, { backgroundColor: '#4CAF50' }]} />
+              <Text style={[s.timerText, { color: '#4CAF50' }]}>SAVED</Text>
+            </Animated.View>
+          </View>
         </View>
 
       </View>
@@ -199,31 +239,29 @@ export default function HomeScreen() {
       <View style={s.center}>
         <View style={s.stage}>
 
-          {RINGS.map((ring, i) => (
-            <Animated.View
-              key={i}
-              style={[StyleSheet.absoluteFill, { transform: [{ scale: ringScales[i] }], opacity: ringOpacities[i] }]}
-              pointerEvents="none"
-            >
-              <Svg width="100%" height="100%" viewBox="0 0 400 400">
-                <AnimatedCircle
-                  cx={200} cy={200} r={ring.r}
-                  stroke={ringColor}
-                  strokeWidth={ringWidth}
-                  strokeDasharray={ring.dashArray ?? undefined}
-                  fill="none"
-                />
-              </Svg>
-            </Animated.View>
-          ))}
+          <Animated.View
+            style={[StyleSheet.absoluteFill, { opacity: ringOpacity }]}
+            pointerEvents="none"
+          >
+            <Svg width="100%" height="100%" viewBox="0 0 400 400">
+              <AnimatedCircle
+                cx={200} cy={200} r={ringR}
+                stroke={ringColor}
+                strokeWidth={ringWidth}
+                fill="none"
+              />
+            </Svg>
+          </Animated.View>
 
           <View style={s.btnFloat}>
             <TouchableOpacity onPress={toggleRecord} activeOpacity={0.9}>
               <Animated.View style={[s.recordBtn, {
+                width: buttonSize,
+                height: buttonSize,
+                borderRadius: buttonRadius,
                 backgroundColor: buttonBg,
                 borderColor: buttonBorder,
-                borderWidth: isRecording ? 1 : 0,
-                transform: [{ scale: buttonScale }],
+                borderWidth: isRecording ? 1.5 : 0,
               }]}>
                 <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: btnImgOpacity }]}>
                   <Image
@@ -237,9 +275,10 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
+
         </View>
       </View>
-    
+
       {/* ── Pause / Resume ── */}
       <View style={s.pauseArea}>
         <Animated.View style={{ opacity: pauseBtnOpacity, transform: [{ translateY: pauseBtnY }] }}>
@@ -259,7 +298,7 @@ export default function HomeScreen() {
       <Animated.View style={[s.quoteWrap, { opacity: quoteOpacity, transform: [{ translateY: quoteY }] }]}>
         <Text style={s.quote}>i speak therefore i am</Text>
       </Animated.View>
-      
+
     </SafeAreaView>
   );
 }
@@ -319,12 +358,21 @@ const s = StyleSheet.create({
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 8,
+  },
+  statusSlot: {
+    position: 'relative',
+    alignItems: 'flex-end',
+  },
+  savedOverlay: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
   statusDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     borderColor: C.inkFaint,
   },
 
@@ -342,12 +390,18 @@ const s = StyleSheet.create({
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
+  timerText: {
+    fontFamily: F.mono,
+    fontSize: 18,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+  },
 
   // ── Center stage ─────────────────────────────────────────────────────────
   center: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center', // Anchors to the true middle
+    justifyContent: 'center',
     top: 80,
   },
   stage: {
@@ -358,19 +412,14 @@ const s = StyleSheet.create({
   },
   btnFloat: {},
   recordBtn: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
   btnImg: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: '100%',
+    height: '100%',
   },
-
 
   // ── Pause button ──────────────────────────────────────────────────────────
   pauseArea: {

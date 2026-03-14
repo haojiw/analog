@@ -30,6 +30,16 @@ function MindIcon({ color }: { color: string }) {
   );
 }
 
+// Two concentric rings — iPhone home button
+function HomeIcon() {
+  const color = C.inkFaint;
+  return (
+    <View style={[s.homeOuter, { borderColor: color }]}>
+      <View style={[s.homeInner, { borderColor: color }]} />
+    </View>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // TabBar
 // ---------------------------------------------------------------------------
@@ -74,7 +84,7 @@ function TabBar({ state, navigation }: any) {
             activeOpacity={0.7}
           >
             {isCenter ? (
-              <View style={[s.centerDot, focused && s.centerDotActive]} />
+              <HomeIcon />
             ) : i === 0 ? (
               <>
                 <LibraryIcon color={color} />
@@ -147,17 +157,22 @@ const s = StyleSheet.create({
     borderRadius: 2,
   },
 
-  // Home center dot
-  centerDot: {
-    width: 32,
-    height: 32,
-    borderRadius: 15,
+  // Home: two concentric rings (iPhone home button)
+  homeOuter: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     borderWidth: 1.5,
-    borderColor: C.inkFaint,
     backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  centerDotActive: {
-    borderColor: C.inkFaint,
+  homeInner: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 0.8,
+    backgroundColor: 'transparent',
   },
 
   label: {

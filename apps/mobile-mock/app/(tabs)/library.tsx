@@ -155,15 +155,13 @@ function LibraryHeader() {
 // Collection chips
 // ---------------------------------------------------------------------------
 
-const CHIP_SIZE = 44;
+const CHIP_SIZE = 36;
 const CHIP_LABEL_WIDTH = 60;
 
 function FavoritesChip() {
   return (
     <TouchableOpacity style={s.chip} activeOpacity={0.7}>
-      <View style={s.chipSlot}>
-        <Text style={s.chipStar}>★</Text>
-      </View>
+      <Ionicons name="star" size={CHIP_SIZE} color={C.ink} />
       <Text style={s.chipLabel} numberOfLines={1}>Favorites</Text>
     </TouchableOpacity>
   );
@@ -453,17 +451,6 @@ const s = StyleSheet.create({
   chip: {
     alignItems: 'center',
     width: CHIP_LABEL_WIDTH,
-  },
-  chipSlot: {
-    width: CHIP_SIZE,
-    height: CHIP_SIZE,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chipStar: {
-    fontSize: 26,
-    color: C.ink,
-    lineHeight: CHIP_SIZE,
   },
   chipCircle: {
     width: CHIP_SIZE,

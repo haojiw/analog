@@ -26,6 +26,7 @@ export default function RootLayout() {
   const [assets] = useAssets([
     textures.background,
     textures.space,
+    require('../assets/space/universe.jpg'),
   ]);
 
   const ready = fontsLoaded && !!assets;
