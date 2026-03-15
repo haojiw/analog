@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,16 @@ import {
   TouchableOpacity,
   Modal,
   StyleSheet,
+  ActionSheetIOS,
+  Platform,
+  Pressable,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../src/theme/tokens';
 import { mockLogs, MockLog } from '../../src/mocks/data';
+import { Swipeable } from 'react-native-gesture-handler';
+import { SwipeableLogRow } from '../../src/components/SwipeableLogRow';
 
 const C = theme.colors;
 const F = theme.fonts;
@@ -26,6 +31,10 @@ function formatTime(date: Date): string {
   const hour12 = h % 12 === 0 ? 12 : h % 12;
   const min = m.toString().padStart(2, '0');
   return `${hour12}:${min} ${ampm}`;
+}
+
+function formatDate(date: Date): string {
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function formatDuration(ms: number): string {
@@ -219,48 +228,26 @@ function DateSquare({ day }: { day: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// LogRow
-// ---------------------------------------------------------------------------
-
-type LogRowProps = {
-  log: MockLog;
-  onPress: (log: MockLog) => void;
-};
-
-function LogRow({ log, onPress }: LogRowProps) {
-  const ms = totalAudioMs(log);
-  let durationStr: string | null = null;
-
-  if (ms > 0) {
-    durationStr = formatDuration(ms);
-  } else if (log.entries.length > 0 && log.entries.every((e) => e.type === 'text')) {
-    durationStr = 'txt';
-  }
-
-  return (
-    <TouchableOpacity
-      onPress={() => onPress(log)}
-      activeOpacity={0.6}
-      style={s.logRow}
-    >
-      <Text style={s.logTitle} numberOfLines={1}>{log.title}</Text>
-      {durationStr != null && (
-        <Text style={s.durationText}>{durationStr}</Text>
-      )}
-    </TouchableOpacity>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // DayGroupView
 // ---------------------------------------------------------------------------
 
 type DayGroupViewProps = {
   dayGroup: DayGroup;
   onPress: (log: MockLog) => void;
+  logCollections: Record<string, string>;
+  onAddToCollection: (logId: string) => void;
+  onDeleteRequest: (log: MockLog) => void;
+  openSwipeableRef: React.MutableRefObject<Swipeable | null>;
 };
 
-function DayGroupView({ dayGroup, onPress }: DayGroupViewProps) {
+function DayGroupView({
+  dayGroup,
+  onPress,
+  logCollections,
+  onAddToCollection,
+  onDeleteRequest,
+  openSwipeableRef,
+}: DayGroupViewProps) {
   const day = dayGroup.date.getDate();
 
   return (
@@ -272,10 +259,104 @@ function DayGroupView({ dayGroup, onPress }: DayGroupViewProps) {
           ) : (
             <View style={s.dateSquareSpacer} />
           )}
-          <LogRow log={log} onPress={onPress} />
+          <SwipeableLogRow
+            log={log}
+            onPress={onPress}
+            onAddToCollection={onAddToCollection}
+            onDeleteRequest={onDeleteRequest}
+            openSwipeableRef={openSwipeableRef}
+          />
         </View>
       ))}
     </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CollectionPickerModal
+// ---------------------------------------------------------------------------
+
+type CollectionPickerModalProps = {
+  visible: boolean;
+  onSelect: (collectionId: string) => void;
+  onClose: () => void;
+};
+
+function CollectionPickerModal({ visible, onSelect, onClose }: CollectionPickerModalProps) {
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      {/* Pressable backdrop — tap outside to dismiss */}
+      <Pressable style={s.pickerBackdrop} onPress={onClose}>
+        {/* Stop event propagation so tapping inside sheet doesn't close it */}
+        <Pressable style={s.pickerSheet} onPress={() => {}}>
+          <View style={s.pickerHandle} />
+          <Text style={s.pickerTitle}>Add to Collection</Text>
+          <TouchableOpacity
+            style={s.pickerRow}
+            activeOpacity={0.7}
+            onPress={() => { onSelect('favorites'); onClose(); }}
+          >
+            <Ionicons name="star" size={20} color={C.gold} />
+            <Text style={s.pickerRowText}>Favorites</Text>
+          </TouchableOpacity>
+          {MOCK_COLLECTIONS.map((c) => (
+            <TouchableOpacity
+              key={c.id}
+              style={s.pickerRow}
+              activeOpacity={0.7}
+              onPress={() => { onSelect(c.id); onClose(); }}
+            >
+              <View style={[s.pickerDot, { backgroundColor: c.color }]} />
+              <Text style={s.pickerRowText}>{c.name}</Text>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity style={s.pickerCancel} activeOpacity={0.7} onPress={onClose}>
+            <Text style={s.pickerCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DeleteConfirmModal
+// ---------------------------------------------------------------------------
+
+type DeleteConfirmModalProps = {
+  log: MockLog | null;
+  onConfirm: () => void;
+  onCancel: () => void;
+};
+
+function DeleteConfirmModal({ log, onConfirm, onCancel }: DeleteConfirmModalProps) {
+  return (
+    <Modal
+      visible={log != null}
+      animationType="fade"
+      transparent
+      onRequestClose={onCancel}
+    >
+      <Pressable style={s.deleteBackdrop} onPress={onCancel}>
+        <Pressable style={s.deleteCard} onPress={() => {}}>
+          <Text style={s.deleteTitle} numberOfLines={1}>{log?.title ?? ''}</Text>
+          <Text style={s.deleteMessage}>Delete this entry?</Text>
+          <View style={s.deleteActions}>
+            <TouchableOpacity style={s.deleteCancelBtn} activeOpacity={0.7} onPress={onCancel}>
+              <Text style={s.deleteCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.deleteConfirmBtn} activeOpacity={0.7} onPress={onConfirm}>
+              <Text style={s.deleteConfirmText}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -289,48 +370,85 @@ type DetailOverlayProps = {
 };
 
 function DetailOverlay({ log, onClose }: DetailOverlayProps) {
+  const insets = useSafeAreaInsets();
+  const [isPlaying, setIsPlaying] = useState(false);
+
   const bars = useMemo(
     () => (log ? barsFromId(log.id, 40) : []),
     [log?.id],
   );
 
   const entry = log?.entries[0];
-  const timeStr = log ? formatTime(log.createdAt) : '';
-  const metaStr =
-    entry?.type === 'audio' ? formatDuration(entry.durationMs) : 'text';
+  const dateTimeStr = log ? `${formatDate(log.createdAt)} · ${formatTime(log.createdAt)}` : '';
+  const totalDuration = entry?.type === 'audio' ? formatDuration(entry.durationMs) : '0:00';
+  const positionStr = '0:00';
+
+  function handleOptions() {
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ['Cancel', 'Delete'], destructiveButtonIndex: 1, cancelButtonIndex: 0 },
+        () => {},
+      );
+    }
+  }
 
   return (
     <Modal
       visible={log != null}
       animationType="slide"
-      presentationStyle="pageSheet"
+      presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
       <View style={s.overlayRoot}>
-        <TouchableOpacity
-          style={s.overlayClose}
-          onPress={onClose}
-          hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
-        >
-          <Text style={s.overlayCloseText}>×</Text>
-        </TouchableOpacity>
+        {/* Header */}
+        <View style={[s.overlayHeader, { paddingTop: insets.top + 8 }]}>
+          <TouchableOpacity
+            style={s.overlayHeaderBtn}
+            onPress={onClose}
+            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          >
+            <Ionicons name="chevron-down" size={26} color={C.inkFaint} />
+          </TouchableOpacity>
 
-        <View style={s.dragHandle} />
+          <Text style={s.overlayHeaderTitle} numberOfLines={1}>
+            {log?.title ?? ''}
+          </Text>
+
+          <TouchableOpacity
+            style={s.overlayHeaderBtn}
+            onPress={handleOptions}
+            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          >
+            <Ionicons name="ellipsis-horizontal" size={22} color={C.inkFaint} />
+          </TouchableOpacity>
+        </View>
 
         <ScrollView
           style={s.overlayScroll}
           contentContainerStyle={s.overlayContent}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={s.overlayMeta}>
-            {timeStr}
-            {entry ? `  ·  ${metaStr}` : ''}
-          </Text>
+          {/* Audio player info row */}
+          <View style={s.playerInfoRow}>
+            <Text style={s.playerInfoText}>{dateTimeStr}</Text>
+            <Text style={s.playerInfoText}>{`${positionStr} / ${totalDuration}`}</Text>
+          </View>
 
-          <View style={s.waveform}>
-            {bars.map((h, i) => (
-              <View key={i} style={[s.waveBar, { height: h }]} />
-            ))}
+          {/* Audio player controls row */}
+          <View style={s.playerControls}>
+            <TouchableOpacity
+              style={s.playBtn}
+              onPress={() => setIsPlaying(p => !p)}
+              hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            >
+              <Ionicons name={isPlaying ? 'pause' : 'play'} size={28} color={C.ink} />
+            </TouchableOpacity>
+
+            <View style={s.waveform}>
+              {bars.map((h, i) => (
+                <View key={i} style={[s.waveBar, { height: h }]} />
+              ))}
+            </View>
           </View>
 
           <View style={s.divider} />
@@ -359,12 +477,51 @@ function DetailOverlay({ log, onClose }: DetailOverlayProps) {
 
 export default function LibraryScreen() {
   const [selectedLog, setSelectedLog] = useState<MockLog | null>(null);
-  const monthGroups = useMemo(() => groupLogs(mockLogs), []);
+  const [deletedLogIds, setDeletedLogIds] = useState<Set<string>>(new Set());
+  const [logCollections, setLogCollections] = useState<Record<string, string>>({});
+  const [collectionPickerTarget, setCollectionPickerTarget] = useState<string | null>(null);
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<MockLog | null>(null);
+  const openSwipeableRef = useRef<Swipeable | null>(null);
+
+  const visibleLogs = useMemo(
+    () => mockLogs.filter((l) => !deletedLogIds.has(l.id)),
+    [deletedLogIds],
+  );
+  const monthGroups = useMemo(() => groupLogs(visibleLogs), [visibleLogs]);
+
+  function handleAddToCollection(logId: string) {
+    setCollectionPickerTarget(logId);
+  }
+
+  function handleCollectionSelect(collectionId: string) {
+    if (collectionPickerTarget) {
+      setLogCollections((prev) => ({ ...prev, [collectionPickerTarget]: collectionId }));
+    }
+    setCollectionPickerTarget(null);
+  }
+
+  function handleDeleteRequest(log: MockLog) {
+    setDeleteConfirmTarget(log);
+  }
+
+  function handleDeleteConfirm() {
+    if (deleteConfirmTarget) {
+      setDeletedLogIds((prev) => new Set([...prev, deleteConfirmTarget.id]));
+    }
+    setDeleteConfirmTarget(null);
+  }
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <LibraryHeader />
-      <ScrollView style={s.logScroll} contentContainerStyle={s.scrollContent}>
+      <ScrollView
+        style={s.logScroll}
+        contentContainerStyle={s.scrollContent}
+        onScrollBeginDrag={() => {
+          openSwipeableRef.current?.close();
+          openSwipeableRef.current = null;
+        }}
+      >
         <CollectionScroll />
         {monthGroups.map((mg) => (
           <View key={mg.monthLabel}>
@@ -376,6 +533,10 @@ export default function LibraryScreen() {
                 key={dg.date.toISOString()}
                 dayGroup={dg}
                 onPress={setSelectedLog}
+                logCollections={logCollections}
+                onAddToCollection={handleAddToCollection}
+                onDeleteRequest={handleDeleteRequest}
+                openSwipeableRef={openSwipeableRef}
               />
             ))}
           </View>
@@ -383,6 +544,18 @@ export default function LibraryScreen() {
       </ScrollView>
 
       <DetailOverlay log={selectedLog} onClose={() => setSelectedLog(null)} />
+
+      <CollectionPickerModal
+        visible={collectionPickerTarget != null}
+        onSelect={handleCollectionSelect}
+        onClose={() => setCollectionPickerTarget(null)}
+      />
+
+      <DeleteConfirmModal
+        log={deleteConfirmTarget}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteConfirmTarget(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -537,31 +710,121 @@ const s = StyleSheet.create({
     flexShrink: 0,
   },
 
-  // Log row
-  logRow: {
+  // Collection picker modal
+  pickerBackdrop: {
     flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(52,43,34,0.3)',
+  },
+  pickerSheet: {
+    backgroundColor: C.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 40,
+  },
+  pickerHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: C.border,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  pickerTitle: {
+    fontFamily: F.mono,
+    fontSize: 13,
+    color: C.inkFaint,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    marginBottom: 20,
+  },
+  pickerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 40,
-    paddingVertical: 10,
-    gap: 8,
+    gap: 14,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: C.border,
   },
-  logTitle: {
-    flex: 1,
+  pickerDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  pickerRowText: {
     fontFamily: F.body,
-    fontWeight: '500',
     fontSize: 16,
     color: C.ink,
-    lineHeight: 20,
+  },
+  pickerCancel: {
+    marginTop: 28,
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  pickerCancelText: {
+    fontFamily: F.mono,
+    fontSize: 13,
+    color: C.inkFaint,
+    letterSpacing: 0.5,
   },
 
-  durationText: {
-    fontFamily: F.mono,
-    fontSize: 12,
+  // Delete confirm modal
+  deleteBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(52,43,34,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  deleteCard: {
+    backgroundColor: C.background,
+    borderRadius: 12,
+    padding: 24,
+    width: '100%',
+  },
+  deleteTitle: {
+    fontFamily: F.body,
+    fontSize: 16,
+    fontWeight: '600',
+    color: C.ink,
+    marginBottom: 8,
+  },
+  deleteMessage: {
+    fontFamily: F.body,
+    fontSize: 14,
     color: C.inkFaint,
-    letterSpacing: 0.2,
-    flexShrink: 0,
-    marginTop: 2,
+    marginBottom: 24,
+  },
+  deleteActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  deleteCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+  },
+  deleteCancelText: {
+    fontFamily: F.mono,
+    fontSize: 13,
+    color: C.inkFaint,
+  },
+  deleteConfirmBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: C.accent,
+    alignItems: 'center',
+  },
+  deleteConfirmText: {
+    fontFamily: F.mono,
+    fontSize: 13,
+    color: '#fff',
   },
 
   // DetailOverlay
@@ -569,26 +832,25 @@ const s = StyleSheet.create({
     flex: 1,
     backgroundColor: C.background,
   },
-  overlayClose: {
-    position: 'absolute',
-    top: 16,
-    right: 20,
-    zIndex: 10,
+  overlayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingBottom: 8,
   },
-  overlayCloseText: {
-    fontFamily: F.mono,
-    fontSize: 22,
-    color: C.inkFaint,
-    lineHeight: 26,
+  overlayHeaderBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  dragHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: C.border,
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 4,
+  overlayHeaderTitle: {
+    flex: 1,
+    fontFamily: F.body,
+    fontSize: 16,
+    fontWeight: '600',
+    color: C.ink,
+    textAlign: 'center',
   },
   overlayScroll: {
     flex: 1,
@@ -598,19 +860,35 @@ const s = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 40,
   },
-  overlayMeta: {
+  playerInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  playerInfoText: {
     fontFamily: F.mono,
     fontSize: 11,
     color: C.inkFaint,
     letterSpacing: 0.5,
+  },
+  playerControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     marginBottom: 20,
   },
+  playBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   waveform: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     height: 40,
     gap: 2,
-    marginBottom: 20,
   },
   waveBar: {
     flex: 1,
